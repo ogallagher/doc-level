@@ -1,0 +1,45 @@
+{
+  "name": "doc-level",
+  "version": "0.1.0",
+  "description": "Analyze texts to estimate reading level.",
+  "keywords": [
+    "text-analyze",
+    "reading-level",
+    "ai-language-model-app"
+  ],
+  "homepage": "https://github.com/ogallagher/doc-level#readme",
+  "bugs": {
+    "url": "https://github.com/ogallagher/doc-level/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ogallagher/doc-level.git"
+  },
+  "license": "SEE LICENSE IN license.txt",
+  "author": "Owen Gallagher <github.com/ogallagher>",
+  "type": "module",
+  "main": "src/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha test",
+    "coverage": "nyc --reporter=text npm run test",
+    "cli": "node src/index.js | pino-pretty"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "openai": "^4.80.1",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "mocha": "^11.1.0",
+    "nyc": "^17.1.0"
+  },
+  "nyc": {
+    "all": true,
+    "check-coverage": true
+  }
+}
