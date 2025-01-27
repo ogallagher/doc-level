@@ -5,7 +5,10 @@
 import * as dotenv from 'dotenv'
 import OpenAI from 'openai'
 import yargs from 'yargs/yargs'
+import path from 'path'
 import { hideBin } from 'yargs/helpers'
+import { StoriesIndex } from './storiesIndex.js'
+import { initDir } from './writer.js'
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -36,12 +39,18 @@ let logger
 /**
  * Load runtime arguments.
  * 
+ * @param {Map<string, StoriesIndex>} storyIndexes
+ * 
  * @returns {Promise<{
- *  logLevel: string
+ *  logLevel: string,
+ *  fetchStories: string | undefined,
+ *  storiesDir: string
  * }>}
  */
-function loadArgs() {
+function loadArgs(storyIndexes) {
   return new Promise(function(res) {
+    logger.debug('load runtime args')
+
     const argv = yargs(hideBin(process.argv))
     .option('log-level', {
       alias: 'l',
@@ -50,8 +59,23 @@ function loadArgs() {
       default: 'info',
       choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']
     })
+    .option('fetch-stories', {
+      alias: 'f',
+      type: 'string',
+      description: 'Fetch stories from a registered index webpage.',
+      choices: storyIndexes
+    })
+    .option('stories-dir', {
+      alias: 'd',
+      type: 'string',
+      description: 'local filesystem directory where story texts are saved',
+      default: path.join('data', 'stories')
+    })
+    .alias('v', 'version')
+    .alias('h', 'help')
     .parse()
   
+    logger.info('loaded runtime args')
     res(argv)
   })
 }
@@ -99,19 +123,23 @@ function loadEnv() {
 }
 
 /**
- * Init module logger and OpenAI api client.
+ * Init module logger, init filesystem, load env and runtime args, connect OpenAI api client.
  * 
  * @param {Logger} parentLogger 
+ * @param {Map<string, StoriesIndex>} storyIndexes
+ * 
  * @returns {Promise<{
  *  ai: OpenAI,
  *  chatModel: string,
  *  maturityModel: string,
  *  readingDifficultyWordsMax: number,
  *  readingDifficultyPhrasesMax: number
- *  logLevel: string
+ *  logLevel: string,
+ *  storiesIndex: string | undefined,
+ *  storiesDir: string
  * }>}
  */
-export function init(parentLogger) {
+export function init(parentLogger, storyIndexes) {
   logger = parentLogger.child(
     {
       name: 'config'
@@ -120,16 +148,23 @@ export function init(parentLogger) {
 
   return Promise.all([
     loadEnv(),
-    loadArgs()
+    loadArgs(storyIndexes)
   ])
   .then(([resEnv, resArgs]) => {
-    return {
-      ai: resEnv.ai,
-      chatModel: resEnv.chatModel,
-      maturityModel: resEnv.maturityModel,
-      readingDifficultyWordsMax: resEnv.readingDifficultyWordsMax,
-      readingDifficultyPhrasesMax: resEnv.readingDifficultyPhrasesMax,
-      logLevel: resArgs.logLevel
-    }
+    return new Promise((res) => {
+      // init filesystem
+      initDir(resArgs.storiesDir)
+      
+      res({
+        ai: resEnv.ai,
+        chatModel: resEnv.chatModel,
+        maturityModel: resEnv.maturityModel,
+        readingDifficultyWordsMax: resEnv.readingDifficultyWordsMax,
+        readingDifficultyPhrasesMax: resEnv.readingDifficultyPhrasesMax,
+        logLevel: resArgs.logLevel,
+        storiesIndex: resArgs.fetchStories,
+        storiesDir: resArgs.storiesDir
+      })
+    })
   }) 
 }

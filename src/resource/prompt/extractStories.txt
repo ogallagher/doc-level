@@ -1,0 +1,6 @@
+Given each url to a webpage that lists short stories, you are extracting an array of up to {0} of these stories called "stories" from within the page. For each story extracted you will provide the following attributes:
+
+- "authorName" = name of the author.
+- "title" = story title.
+- "publishDate" = date that the story was published, in ISO format.
+- "viewCount" = count of readers that have visited the story page.

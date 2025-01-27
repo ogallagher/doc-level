@@ -2,6 +2,10 @@
  * doc-level entrypoint.
  * 
  * TODO edit readingDifficulty.txt to specify native language reader difficulty; it seems to overestimate.
+ * TODO investigate why reader.fetchStories did not match stories in current webpage. 
+ *  Archived page?
+ *  Too much creativity?
+ *  I tried to use downloaded copy of the page instead, but that raw input is much too large.
  * TODO accept url to stories list to visit each and download full text
  * TODO convert each text to excerpt of configurable length and pass into reader
  */ 
@@ -11,6 +15,7 @@ import * as reader from './reader.js'
 import * as tp from './textProfile.js'
 import * as ms from './messageSchema.js'
 import * as writer from './writer.js'
+import * as si from './storiesIndex.js'
 import pino from 'pino'
 
 /**
@@ -26,17 +31,20 @@ const logger = pino(
 Promise.all([
   tp.init(logger),
   ms.init(logger),
-  writer.init(logger)
+  writer.init(logger),
+  si.init(logger)
 ])
-.then(() => {
-  return config.init(logger)
+.then(([, , , siIndexes]) => {
+  logger.info('story indexes = %o', siIndexes)
+  return config.init(logger, siIndexes)
 })
 .then(
   ({ 
     ai, chatModel, maturityModel, 
     readingDifficultyWordsMax,
     readingDifficultyPhrasesMax,
-    logLevel 
+    logLevel, 
+    storiesIndex, storiesDir
   }) => {
     logger.level = logLevel
 
@@ -47,12 +55,39 @@ Promise.all([
       maturityModel
     )
   
-    return reader.init(logger, ai, chatModel, maturityModel, readingDifficultyWordsMax, readingDifficultyPhrasesMax)
+    return reader
+    .init(logger, ai, chatModel, maturityModel, readingDifficultyWordsMax, readingDifficultyPhrasesMax)
+    .then(() => {
+      return {indexName: storiesIndex, storiesDir}
+    })
   }
 )
+.then(({indexName, storiesDir}) => {
+  let p
+  if (indexName !== undefined) {
+    // fetch stories from requested index
+    const storiesIndex = si.getStoriesIndex(indexName)
+    p = reader.fetchStories(storiesIndex, 3, storiesDir)
+    .then((pagedStories) => {
+      logger.info('fetched %s pages of stories from %s', pagedStories.size, storiesIndex)
+      pagedStories.forEach((stories, page) => {
+        console.log(`page[${page}] = ${JSON.stringify(stories, undefined, 2)}`)
+      })
+    })
+  }
+  else {
+    logger.debug('skip stories fetch')
+    p = Promise.resolve()
+  }
+
+  // TODO resolve path to stories
+  return p.then(() => {
+    throw new Error('stop')
+  })
+})
 .then(
   () => {
-    logger.info('reader.init passed')
+    // load story text
     let path = 'data/이야기_1번.txt'
     return reader.loadText(path, 100)
     .then((text) => {return { text, path }})

@@ -69,3 +69,26 @@ ReadingDifficulty.name = 'ReadingDifficulty'
  *  difficultPhrases: string[]
  * }} ReadingDifficultyResponse
  */
+
+export let Stories = z.object({
+  stories: z.array(z.object({
+    authorName: z.string(),
+    title: z.string(),
+    publishDate: z.string(),
+    viewCount: z.number()
+  }))
+})
+Stories.name = 'Stories'
+/**
+ * @typedef {{
+ *  authorName: string,
+ *  title: string,
+ *  publishDate: Date,
+ *  viewCount: number
+ * }} Story
+ */
+/**
+ * @typedef {{
+ *  stories: Story[]
+ * }} ExtractStoriesResponse
+ */

@@ -28,6 +28,16 @@ This looks for offensive markers in text and images, from the categories listed 
 "harassment/threatening","violence"
 ```
 
+### `chat.completions`
+
+General purpose natural language prompts. Input can be a combination of:
+
+1. `role=developer` Contextual directions that take precendence over user directives.
+1. `role=assistant` Past responses by the language model/assistant.
+2. `role=user` Past and present prompts/queries by the user.
+
+For app integration, passing a JSON object schema to `response_format` ensures the response can be easily parsed.
+
 ## References
 
 [OpenAI API docs](https://platform.openai.com/docs/overview)

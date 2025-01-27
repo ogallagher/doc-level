@@ -5,6 +5,7 @@ import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
 import { loadPrompt, loadText, init as readerInit, setPromptDir } from '../src/reader.js'
+import * as storiesIndex from '../src/storiesIndex.js'
 
 const logger = pino(
   {
@@ -89,6 +90,59 @@ describe('reader', function() {
       return loadText('test/resource/text1.txt', 5)
       .then((text) => {
         assert.strictEqual(text.length, 5)
+      })
+    })
+  })
+})
+
+describe('storiesIndex', function() {
+  describe('#init', function() {
+    it('passes with parent logger', function() {
+      return storiesIndex.init(logger)
+    })
+  })
+
+  describe('StoriesIndex', function() {
+    let asi, mji
+    /**
+     * @type {Map}
+     */
+    let indexes
+
+    this.beforeAll(function() {
+      asi = new storiesIndex.StoriesIndex('https://host.tld', ['abstract0'])
+      mji = new storiesIndex.MunjangStoriesIndex()
+
+      return storiesIndex.init(logger)
+      .then((storiesIndexes) => {
+        indexes = storiesIndexes
+      })
+    })
+
+    describe('#getPageUrl', function() {
+      it('fails as abstract method', function() {
+        assert.throws(
+          () => {
+            asi.getPageUrl()
+          },
+          {
+            cause: 'abstract method'
+          }
+        )
+      })
+
+      it('passes as implemented method', function() {
+        assert.doesNotThrow(
+          () => {
+            mji.getPageUrl(mji.pageNumberMin)
+          }
+        )
+      })
+    })
+
+    describe('#storiesIndexes', function() {
+      it('is updated with each instance', function() {
+        assert.ok(indexes.indexOf(asi.name) > 0)
       })
     })
   })

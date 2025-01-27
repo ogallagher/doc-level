@@ -6,13 +6,15 @@ import { zodResponseFormat } from 'openai/helpers/zod'
 import path from 'path'
 import { readFile } from 'node:fs/promises'
 import { Maturity, TextProfile, Difficulty, MATURITY_TYPE_PROFANE } from './textProfile.js'
-import { CustomMaturityTypes, ReadingDifficulty } from './messageSchema.js'
+import { CustomMaturityTypes, ReadingDifficulty, Stories } from './messageSchema.js'
 import { formatString } from './stringUtil.js'
 import {
   READING_DIFFICULTY_REASONS_MAX as _difficultReasonsMax,
   READING_DIFFICULTY_WORDS_MIN as _difficultWordsMin,
   READING_DIFFICULTY_PHRASES_MIN as _difficultPhrasesMin
 } from './config.js'
+import { StoriesIndex } from './storiesIndex.js'
+import { downloadWebpage, initDir, writeText } from './writer.js'
 
 /**
  * @typedef {import('pino').Logger} Logger
@@ -21,15 +23,16 @@ import {
  */
 /**
  * @typedef {import('./messageSchema.js').MessageSchema} MessageSchema
- * 
  * @typedef {import('./messageSchema.js').CustomMaturityTypesResponse} CustomMaturityTypesResponse
- * 
  * @typedef {import('./messageSchema.js').ReadingDifficultyResponse} ReadingDifficultyResponse
+ * @typedef {import('./messageSchema.js').ExtractStoriesResponse} ExtractStoriesResponse
+ * @typedef {import('./messageSchema.js').Story} Story
  */
 
 let PROMPT_DIR = path.join(import.meta.dirname, 'resource/prompt')
 export const PROMPT_CUSTOM_MATURITY_FILE = 'customMaturity.txt'
 export const PROMPT_READING_DIFFICULTY_FILE = 'readingDifficulty.txt'
+export const PROMPT_EXTRACT_STORIES_FILE = 'extractStories.txt'
 
 /**
  * @type {Logger}
@@ -198,6 +201,90 @@ export function loadPrompt(templatePath, ...args) {
         rej(err)
       }
     )
+  })
+}
+
+/**
+ * Fetch story summaries from an index/listing online.
+ * 
+ * @param {StoriesIndex} storiesIndex 
+ * @param {number} storiesMax 
+ * @param {string} storiesParentDir 
+ * @returns {Promise<Map<number, Story[]>>} Paged list of stories.
+ */
+export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
+  logger.info('fetch up to %s stories from %s and save to %s', storiesMax, storiesIndex, storiesParentDir)
+  let pageNumber = storiesIndex.pageNumberMin
+  let storiesCount = 0
+  let storiesRemaining = () => {return storiesMax - storiesCount}
+  /**
+   * @type {Map<number, Story[]>}
+   */
+  let pagedStories = new Map()
+  /**
+   * @type {string}
+   */
+  let storiesPath
+  let writeStoryPromises = []
+  /**
+   * @type {Promise[]}
+   */
+  let fetchStory = (prompt) => {
+    if (storiesCount < storiesMax && pageNumber < storiesIndex.pageNumberMax) {
+      storiesPath = path.join(storiesParentDir, storiesIndex.name, `page-${pageNumber}`)
+
+      return initDir(storiesPath).then(() => {
+        return downloadWebpage(
+          storiesIndex.getPageUrl(pageNumber).toString(),
+          path.join(storiesPath, 'index.html')
+        )
+      })
+      .then((indexPagePath) => {
+        return readFile(indexPagePath, {encoding: 'utf-8'})
+      })
+      .then((indexPage) => {
+        getChatResponse(
+          formatString(prompt, storiesRemaining()),
+          indexPage,
+          Stories
+        )
+      })
+      .then(
+        /**
+         * @param {ExtractStoriesResponse} storiesResponse 
+         */
+        (storiesResponse) => {
+          logger.info('fetched %s stories from page %s', storiesResponse.stories.length, pageNumber)
+          
+          // save story to memory and filesystem
+          pagedStories.set(pageNumber, storiesResponse.stories)
+          writeStoryPromises.push(() => {
+            return initDir(storiesPath)
+            .then(() => {
+              writeText(
+                JSON.stringify(storiesResponse, undefined, 2),
+                path.join(storiesPath, 'index.json')
+              )
+            })
+          })
+
+          storiesCount += storiesResponse.stories.length
+          pageNumber++
+
+          // recursive call to loop
+          return fetchStory(prompt)
+        }
+      )
+    }
+    else {
+      return Promise.all(writeStoryPromises)
+    }
+  }
+
+  return loadPrompt(PROMPT_EXTRACT_STORIES_FILE)
+  .then(fetchStory)
+  .then(() => {
+    return pagedStories
   })
 }
 
