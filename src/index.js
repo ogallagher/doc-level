@@ -2,11 +2,7 @@
  * doc-level entrypoint.
  */
 
-/*
-TODO edit readingDifficulty.txt to specify native language reader difficulty; it seems to overestimate.
-
-TODO convert each text to configurable list of excerpts and pass into reader for analysis.
-*/
+// TODO edit readingDifficulty.txt to specify native language reader difficulty; it seems to overestimate.
 
 import * as config from './config.js'
 import * as reader from './reader.js'
@@ -18,7 +14,6 @@ import pino from 'pino'
 import * as readline from 'node:readline/promises'
 import yargs from 'yargs/yargs'
 import path from 'path'
-import { constants as fsConstants } from 'node:fs/promises'
 import { regexpEscape } from './stringUtil.js'
 /**
  * @typedef {import('./storiesIndex.js').Story} Story
@@ -125,7 +120,7 @@ function main(storyIndexes, argSrc) {
       // fetch stories from requested index
       const storiesIndex = si.getStoriesIndex(args.fetchStoriesIndex)
 
-      pFetch = reader.fetchStories(storiesIndex, 3, args.storiesDir)
+      pFetch = reader.fetchStories(storiesIndex, args.fetchStoriesMax, args.storiesDir)
       .then((pagedStories) => {
         logger.info('fetched %s pages of stories from %s', pagedStories.size, storiesIndex)
       })
@@ -148,6 +143,10 @@ function main(storyIndexes, argSrc) {
   // show available local story lists if no story selected,
   // or fetch story
   .then(({ args, storyIndexPaths }) => {
+    /**
+     * @type {string[]|undefined}
+     */
+    let storyText
     if (args.story === undefined) {
       return reader.loadPrompt(
         reader.PROMPT_BROWSE_STORIES_FILE, 
@@ -157,7 +156,7 @@ function main(storyIndexes, argSrc) {
       )
       .then((browseStoriesPrompt) => {
         console.log(browseStoriesPrompt)
-        return { args, storyText: undefined }
+        return { args, storyText }
       })
     }
     else {
@@ -215,35 +214,38 @@ function main(storyIndexes, argSrc) {
         /**
          * @type {string}
          */
-        let textFragment, storyText = ''
+        let textFragment
         const storyPath = path.join(args.storiesDir, siName, `story-${args.story}`, 'story.txt')
         return writer.initDir(path.dirname(storyPath))
-        .then(() => {
-          let p = Promise.resolve()
+        .then(async () => {
+          storyText = []
+          let storyFile = await writer.openFile(storyPath)
           while (textFragment = textGenerator.next().value) {
-            p = p.then(() => {
-              storyText += textFragment
-              return writer.writeText(textFragment, storyPath)
-            })
+            // create local reference so that next iteration can fetch while file is open
+            storyText.push(textFragment)
+            await writer.writeText(textFragment + '\n\n', storyFile)
           }
-          return p
+
+          storyFile.close()
         })
         .then(() => {
-          logger.info('saved story=%s length=%s to %s', args.story, storyText.length, storyPath)
+          logger.info('saved story=%s paragraph-count=%s to %s', args.story, storyText.length, storyPath)
           return { args, storyText }
         })
       })
-      .catch((err) => {
-        logger.error(err)
+    }
+  })
+  // reduce story
+  .then(({ args, story }) => {
+    if (story !== undefined) {
+      return reader.reduceStory(story, args.storyLengthMax)
+      .then((excerpt) => {
+        logger.info('reduced story len=%s to excerpt len=%s', story.length, excerpt.length)
+        return {args, excerpt}
       })
-      
-      // load story text
-      // let path = 'data/이야기_1번.txt'
-      // return reader.loadText(path, 100)
-      // .then((text) => {
-      //   logger.info('text load from %s passed of length=%s', path, text.length)
-      //   return { text, path }
-      // })
+    }
+    else {
+      return {args, story}
     }
   })
   // create story profile

@@ -250,6 +250,10 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
         return storiesIndex.getStorySummaries(pageHtml)
       })
       .then(
+        /**
+         * 
+         * @param {Generator<Story>} storySummariesGenerator
+         */
         (storySummariesGenerator) => {
           let storySummaries = []
           /**
