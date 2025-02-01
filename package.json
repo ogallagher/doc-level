@@ -23,12 +23,13 @@
     "test": "test"
   },
   "scripts": {
-    "test": "mocha test",
+    "test": "mocha test | pino-pretty -L info",
     "coverage": "nyc --reporter=text npm run test",
     "cli": "node src/index.js -l info | pino-pretty"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "node-html-parser": "^7.0.1",
     "openai": "^4.80.1",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",

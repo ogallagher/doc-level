@@ -1,5 +1,8 @@
+import * as path from 'path'
 /**
  * @typedef {import('pino').Logger} Logger
+ * 
+ * @typedef {import('./messageSchema.js').Story} Story
  */
 
 /**
@@ -97,12 +100,35 @@ export class StoriesIndex {
         throw err
     }
 
+    /**
+     * Parse a list of story summaries from the stories index page content.
+     * 
+     * @param {HTMLElement} indexPage Parsed page. Note this will actually be a subset of the `HTMLElement`
+     * interface depending on the chosen html parser implementation and it being read-only.
+     * @returns {Generator<Story>}
+     */
+    *getStorySummaries(indexPage) {
+        throw new Error('abstract method must be implemented by subclass', {
+            cause: 'abstract method'
+        })
+    }
+
     toString() {
         return `StoriesIndex[${this.name}=${this.urlTemplate.hostname}]`
     }
 }
 
 export class MunjangStoriesIndex extends StoriesIndex {
+    static selectorStories = (
+        '#contents .board.container > .board_list .list_ul .list_li'
+    )
+    static selectorStoryUrl = 'a.item[href^="/board.es"][href*="list_no="]'
+    static selectorExcerpt = '.txt p.desc'
+    static selectorTitleAuthor = '.txt .title'
+    static selectorMeta = '.txt .etc_info'
+    static selectorMetaDate = '.date span'
+    static selectorMetaViews = '.hit span'
+
     constructor() {
         super(
             'https://munjang.or.kr/board.es?mid=a20103000000&bid=0003&act=list&ord=RECENT&nPage=1',
@@ -117,5 +143,62 @@ export class MunjangStoriesIndex extends StoriesIndex {
         let url = new URL(this.urlTemplate)
         url.searchParams.set('nPage', pageNumber)
         return url
+    }
+
+    /**
+     * @param {HTMLElement} indexPage 
+     * @returns {Generator<Story>}
+     */
+    *getStorySummaries(indexPage) {
+        logger.debug('isolate list of stories at selector=%s', MunjangStoriesIndex.selectorStories)
+
+        const storiesEl = indexPage.querySelectorAll(MunjangStoriesIndex.selectorStories)
+        logger.info('found %s stories in index page', storiesEl.length)
+
+        for (let [idx, storyEl] of storiesEl.entries()) {
+            try {
+                const titleAuthor = storyEl.querySelector(MunjangStoriesIndex.selectorTitleAuthor).textContent
+                logger.info('stories[%s] title-author=%s', idx, titleAuthor)
+
+                const splitIdx = titleAuthor.indexOf('-')
+                const author = titleAuthor.substring(0, splitIdx)
+                const title = titleAuthor.substring(splitIdx + 1)
+                logger.debug('stories[%s] title.raw=%s author.raw=%s', idx, title, author)
+
+                const meta = storyEl.querySelector(MunjangStoriesIndex.selectorMeta)
+                const excerpt = storyEl.querySelector(
+                    MunjangStoriesIndex.selectorExcerpt
+                ).textContent
+                .replace(/&lsquo.+&rsquo;\s+/, '')
+                .replace(/광고 건너뛰기▶｜\s+/, '')
+                .trim()
+                
+                /**
+                 * @type {Story}
+                 */
+                let storySummary = {
+                    authorName: author.trim(),
+                    title: title.trim(),
+                    publishDate: new Date(meta.querySelector(MunjangStoriesIndex.selectorMetaDate).textContent),
+                    viewCount: parseInt(meta.querySelector(MunjangStoriesIndex.selectorMetaViews).textContent),
+                    // concatenate origin (root without path) and story path
+                    url: path.join(
+                        this.urlTemplate.origin,
+                        storyEl.querySelector(MunjangStoriesIndex.selectorStoryUrl).getAttribute('href')
+                    ),
+                    excerpts: [
+                        excerpt
+                    ]
+                }
+                logger.debug('stories[%s] summary object=%o', idx, storySummary)
+
+                yield storySummary
+            }
+            catch (err) {
+                throw new Error(`failed to parse summary of stories[${idx}]`, {
+                    cause: err
+                })
+            }
+        }
     }
   }

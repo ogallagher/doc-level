@@ -75,7 +75,8 @@ export let Stories = z.object({
     authorName: z.string(),
     title: z.string(),
     publishDate: z.string(),
-    viewCount: z.number()
+    viewCount: z.number(),
+    url: z.string()
   }))
 })
 Stories.name = 'Stories'
@@ -84,7 +85,9 @@ Stories.name = 'Stories'
  *  authorName: string,
  *  title: string,
  *  publishDate: Date,
- *  viewCount: number
+ *  viewCount: number,
+ *  url: string,
+ *  excerpts: string[]
  * }} Story
  */
 /**

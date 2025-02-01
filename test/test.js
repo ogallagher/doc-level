@@ -4,13 +4,13 @@ import path from 'path'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
-import { loadPrompt, loadText, init as readerInit, setPromptDir } from '../src/reader.js'
+import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml } from '../src/reader.js'
 import * as storiesIndex from '../src/storiesIndex.js'
 
 const logger = pino(
   {
     name: 'test-app',
-    level: 'warn'
+    level: 'debug'
   }
 )
 
@@ -93,6 +93,21 @@ describe('reader', function() {
       })
     })
   })
+
+  describe('#parseHtml', function() {
+    it('works with selectors when file is found', function() {
+      return parseHtml('test/resource/index1.html')
+      .then((root) => {
+        let title = root.querySelector('head > title')
+        assert.ok(title)
+        assert.notStrictEqual(title.textContent.indexOf('index 1'), -1)
+
+        let id1_1 = root.querySelector('#id1')
+        let id1_2 = root.querySelector('body article').querySelector('p#id1')
+        assert.strictEqual(id1_1, id1_2)
+      })
+    })
+  })
 })
 
 describe('storiesIndex', function() {
@@ -103,7 +118,14 @@ describe('storiesIndex', function() {
   })
 
   describe('StoriesIndex', function() {
-    let asi, mji
+    /**
+     * @type {storiesIndex.StoriesIndex}
+     */
+    let asi
+    /**
+     * @type {storiesIndex.MunjangStoriesIndex}
+     */
+    let mji
     /**
      * @type {Map}
      */
@@ -143,6 +165,24 @@ describe('storiesIndex', function() {
     describe('#storiesIndexes', function() {
       it('is updated with each instance', function() {
         assert.ok(indexes.indexOf(asi.name) > 0)
+      })
+    })
+
+    describe('#getStorySummaries', function() {
+      describe('Munjang implementation', function() {
+        it('parses stories from real page without failures', function() {
+          return parseHtml('test/resource/index2.html')
+          .then((htmlPage) => {
+            for (let storySummary of mji.getStorySummaries(htmlPage)) {
+              assert.ok(storySummary.authorName.length < 10)
+              assert.ok(storySummary.title.length > 2)
+              assert.ok(storySummary.publishDate < new Date())
+              assert.ok(storySummary.viewCount > 0)
+              assert.strictEqual(new URL(storySummary.url).host, 'munjang.or.kr')
+              assert.ok(storySummary.excerpts.length == 1 && storySummary.excerpts[0].length > 50)
+            }
+          })
+        })
       })
     })
   })

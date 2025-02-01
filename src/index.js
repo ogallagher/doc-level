@@ -1,14 +1,18 @@
 /**
  * doc-level entrypoint.
- * 
- * TODO edit readingDifficulty.txt to specify native language reader difficulty; it seems to overestimate.
- * TODO investigate why reader.fetchStories did not match stories in current webpage. 
- *  Archived page?
- *  Too much creativity?
- *  I tried to use downloaded copy of the page instead, but that raw input is much too large.
- * TODO accept url to stories list to visit each and download full text
- * TODO convert each text to excerpt of configurable length and pass into reader
- */ 
+ */
+
+/*
+TODO edit readingDifficulty.txt to specify native language reader difficulty; it seems to overestimate.
+
+TODO reader.fetchStories did not match stories in current webpage; the stories are fully invented.
+  I tried to use downloaded copy of the page instead, but that raw input is much too large so far.
+  TODO parse downloaded index as list of story summaries. https://www.npmjs.com/package/node-html-parser
+
+  TODO download each story full text.
+  
+  TODO convert each text to configurable list of excerpts and pass into reader for analysis.
+*/
 
 import * as config from './config.js'
 import * as reader from './reader.js'

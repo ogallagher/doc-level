@@ -5,6 +5,7 @@
 import { zodResponseFormat } from 'openai/helpers/zod'
 import path from 'path'
 import { readFile } from 'node:fs/promises'
+import * as HtmlParser from 'node-html-parser'
 import { Maturity, TextProfile, Difficulty, MATURITY_TYPE_PROFANE } from './textProfile.js'
 import { CustomMaturityTypes, ReadingDifficulty, Stories } from './messageSchema.js'
 import { formatString } from './stringUtil.js'
@@ -232,8 +233,8 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
   let fetchStory = (prompt) => {
     if (storiesCount < storiesMax && pageNumber < storiesIndex.pageNumberMax) {
       storiesPath = path.join(storiesParentDir, storiesIndex.name, `page-${pageNumber}`)
-
-      return initDir(storiesPath).then(() => {
+      
+      initDir(storiesPath).then(() => {
         return downloadWebpage(
           storiesIndex.getPageUrl(pageNumber).toString(),
           path.join(storiesPath, 'index.html')
@@ -249,6 +250,13 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
           Stories
         )
       })
+      /*
+      return getChatResponse(
+        formatString(prompt, storiesRemaining()),
+        storiesIndex.getPageUrl(pageNumber).toString(),
+        Stories
+      )
+      */
       .then(
         /**
          * @param {ExtractStoriesResponse} storiesResponse 
@@ -258,15 +266,15 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
           
           // save story to memory and filesystem
           pagedStories.set(pageNumber, storiesResponse.stories)
-          writeStoryPromises.push(() => {
-            return initDir(storiesPath)
+          writeStoryPromises.push(
+            initDir(storiesPath)
             .then(() => {
-              writeText(
+              return writeText(
                 JSON.stringify(storiesResponse, undefined, 2),
                 path.join(storiesPath, 'index.json')
               )
             })
-          })
+          )
 
           storiesCount += storiesResponse.stories.length
           pageNumber++
@@ -281,6 +289,7 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
     }
   }
 
+  // TODO Edit prompt to handle reduced task complexity
   return loadPrompt(PROMPT_EXTRACT_STORIES_FILE)
   .then(fetchStory)
   .then(() => {
@@ -450,6 +459,31 @@ export function loadText(textPath, lenMax) {
     (err) => {
       logger.error('failed to load text from %s', textPath)
       throw err
+    }
+  )
+}
+
+/**
+ * Load and parse an HTML document or fragment.
+ * 
+ * @param {string} htmlPath 
+ * @returns {Promise<HTMLElement>}
+ */
+export function parseHtml(htmlPath) {
+  return loadText(htmlPath)
+  .then(
+    (htmlText) => {
+      logger.debug('parse html from loaded string length=%s', htmlText.length)
+      return HtmlParser.parse(htmlText, {
+        comment: false,
+        fixNestedATags: false,
+        parseNoneClosedTags: false
+      })
+    },
+    (err) => {
+      throw new Error(`failed to load text from file=${htmlPath}`, {
+        cause: err
+      })
     }
   )
 }
