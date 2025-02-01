@@ -20,7 +20,7 @@ const storiesIndexes = new Map()
  * Init module logger, create stories indexes.
  * 
  * @param {Logger} parentLogger
- * @returns {Promise<Map<string, StoriesIndex>>}
+ * @returns {Promise<string[]>}
  */
 export function init(parentLogger) {
   return new Promise(function(res) {
@@ -86,6 +86,15 @@ export class StoriesIndex {
     }
 
     /**
+     * @throws Error for unimplemented abstract method.
+     */
+    throwErrorNotImplemented() {
+        throw new Error('abstract method must be implemented by subclass', {
+            cause: 'abstract method'
+        })
+    }
+
+    /**
      * Return the compiled url to the given page of listed stories within the index.
      * 
      * @param {number} pageNumber 
@@ -94,10 +103,7 @@ export class StoriesIndex {
      */
     getPageUrl(pageNumber) {
         this.assertPageNumberIsValid(pageNumber)
-        let err = new Error('abstract method must be implemented by subclass', {
-            cause: 'abstract method'
-        })
-        throw err
+        this.throwErrorNotImplemented()
     }
 
     /**
@@ -108,9 +114,17 @@ export class StoriesIndex {
      * @returns {Generator<Story>}
      */
     *getStorySummaries(indexPage) {
-        throw new Error('abstract method must be implemented by subclass', {
-            cause: 'abstract method'
-        })
+        this.throwErrorNotImplemented()
+    }
+
+    /**
+     * Parse the full text of a story from its webpage content.
+     * 
+     * @param {HTMLElement} storyPage Parsed page.
+     * @returns {Generator<string>}
+     */
+    *getStoryText(storyPage) {
+        this.throwErrorNotImplemented()
     }
 
     toString() {

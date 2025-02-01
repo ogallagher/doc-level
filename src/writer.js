@@ -8,6 +8,8 @@ import { createWriteStream } from 'fs'
 import request from 'request'
 /**
  * @typedef {import('pino').Logger} Logger
+ * 
+ * @typedef {import('fs').Mode} Mode
  */
 
 /**
@@ -38,11 +40,12 @@ export function init(parentLogger) {
  * 
  * @param {string} text 
  * @param {string} path 
+ * @param {Mode|undefined} mode File write mode. Default is overwrite. Pass in O_APPEND to append.
  * @returns {Promise<undefined>}
  */
-export function writeText(text, path) {
+export function writeText(text, path, mode) {
     return new Promise(function(res, rej) {
-        writeFile(path, text, {encoding: 'utf-8'})
+        writeFile(path, text, {encoding: 'utf-8', mode: mode})
         .then(
           () => {
             logger.info('write text to %s passed', path)

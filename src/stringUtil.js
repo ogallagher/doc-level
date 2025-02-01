@@ -8,3 +8,13 @@ export function formatString(str, ...args) {
     : match
   })
 }
+
+/**
+ * Taken from https://stackoverflow.com/a/3561711/10200417
+ * 
+ * @param {string} str 
+ * @returns {string}
+ */
+export function regexpEscape(str) {
+  return str.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
+}

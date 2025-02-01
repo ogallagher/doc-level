@@ -5,13 +5,7 @@
 /*
 TODO edit readingDifficulty.txt to specify native language reader difficulty; it seems to overestimate.
 
-TODO reader.fetchStories did not match stories in current webpage; the stories are fully invented.
-  I tried to use downloaded copy of the page instead, but that raw input is much too large so far.
-  TODO parse downloaded index as list of story summaries. https://www.npmjs.com/package/node-html-parser
-
-  TODO download each story full text.
-  
-  TODO convert each text to configurable list of excerpts and pass into reader for analysis.
+TODO convert each text to configurable list of excerpts and pass into reader for analysis.
 */
 
 import * as config from './config.js'
@@ -23,6 +17,12 @@ import * as si from './storiesIndex.js'
 import pino from 'pino'
 import * as readline from 'node:readline/promises'
 import yargs from 'yargs/yargs'
+import path from 'path'
+import { constants as fsConstants } from 'node:fs/promises'
+import { regexpEscape } from './stringUtil.js'
+/**
+ * @typedef {import('./storiesIndex.js').Story} Story
+ */
 
 /**
  * @type {pino.Logger}
@@ -34,165 +34,279 @@ const logger = pino(
   }
 )
 
-// init
-Promise.all([
-  tp.init(logger),
-  ms.init(logger),
-  writer.init(logger),
-  si.init(logger)
-])
-.then(([, , , siIndexes]) => {
-  logger.info('story indexes = %o', siIndexes)
-  return config.init(logger, siIndexes)
-})
-.then(
-  ({ 
-    ai, chatModel, maturityModel, 
-    readingDifficultyWordsMax,
-    readingDifficultyPhrasesMax,
-    logLevel, 
-    storiesIndex, storiesDir
-  }) => {
-    logger.level = logLevel
-
-    logger.info(
-      'config.init passed. ai.baseUrl=%s chatModel=%s maturityModel=%s', 
-      ai.baseURL, 
-      chatModel,
-      maturityModel
+/**
+ * 
+ * @returns {Promise<Map<string, StoriesIndex>>}
+ */
+function init() {
+  return Promise.all([
+    tp.init(logger),
+    ms.init(logger),
+    writer.init(logger),
+    si.init(logger)
+  ])
+  // config
+  .then(([, , , siIndexes]) => {
+    logger.info('story indexes = %o', siIndexes)
+    return config.init(logger, siIndexes)
+    // init modules dependent on config
+    .then(
+      ({ 
+        ai, chatModel, maturityModel, 
+        readingDifficultyWordsMax,
+        readingDifficultyPhrasesMax
+      }) => {
+        logger.info(
+          'config.init passed. ai.baseUrl=%s chatModel=%s maturityModel=%s', 
+          ai.baseURL, 
+          chatModel,
+          maturityModel
+        )
+      
+        return reader
+        .init(logger, ai, chatModel, maturityModel, readingDifficultyWordsMax, readingDifficultyPhrasesMax)
+      }
     )
-  
-    return reader
-    .init(logger, ai, chatModel, maturityModel, readingDifficultyWordsMax, readingDifficultyPhrasesMax)
-    .then(() => {
-      return {indexName: storiesIndex, storiesDir}
-    })
-  }
-)
-// fetch story summaries
-.then(({indexName, storiesDir}) => {
-  if (indexName !== undefined) {
-    // fetch stories from requested index
-    const storiesIndex = si.getStoriesIndex(indexName)
-    return reader.fetchStories(storiesIndex, 3, storiesDir)
-    .then((pagedStories) => {
-      logger.info('fetched %s pages of stories from %s', pagedStories.size, storiesIndex)
-      return storiesDir
-    })
-  }
-  else {
-    logger.info('skip stories fetch')
-    return storiesDir
-  }
-})
-// inform available local story lists
-.then(
-  (storiesDir) => {
-    return reader.listFiles(storiesDir, /index.json$/)
-    .then((storyIndexPaths) => {
-      logger.debug('loaded %s story index paths', storyIndexPaths.length)
-      return reader.loadPrompt(
-        reader.PROMPT_BROWSE_STORIES_FILE, 
-        storyIndexPaths.map((storyIndexPath, idx) => {
-          return `- [${idx}] ${storyIndexPath}`
-        }).join('\n')
-      )
-    })
-    .then((browseStoriesPrompt) => {
-      console.log(browseStoriesPrompt)
-    })
-  }
-)
-// loop select and analyze stories
-.then(
-  () => {
-    const rl = readline.createInterface({
+    .then(() => siIndexes)
+  })
+}
+
+function getArgSrc() {
+  /**
+   * @type {readline.Interface}
+   */
+  let rl
+  return config.argParser.getHelp()
+  .then((prompt) => {
+    rl = readline.createInterface({
       input: process.stdin,
       // output to stderr avoids interfering with pino logger default output to stdout
       output: process.stderr
     })
-
-    // TODO loop story selection prompt
-    // TODO use yargs usage and help 
-    return rl.question('story to analyze: ').then((res) => {
-      rl.close()
-      
-      return yargs(res)
-      .hide('version')
-      .alias('h', 'help')
-      .option('page', {
-        alias: 'p',
-        type: 'string',
-        description: 'stories listing page number',
-        default: '0'
-      })
-      .option('story', {
-        alias: 's',
-        type: 'string',
-        description: 'story id'
-      })
-      .parse()
-    })
-  }
-)
-.then(
-  (pageStoryRes) => {
-    logger.info('page=%s story=%s', pageStoryRes.page, pageStoryRes.story)
-
-    throw new Error('stop')
-    // load story text
-    let path = 'data/이야기_1번.txt'
-    return reader.loadText(path, 100)
-    .then((text) => {return { text, path }})
-  }
-)
-// analyze stories
-.then(({ text, path }) => {
-  logger.info('text load from %s passed of length=%s', path, text.length)
-  let ctx = new reader.Context(text, new tp.TextProfile(), path)
-
-  return Promise.all([
-    new Promise(function(res) {
-      logger.info('get maturity of %s...', text.substring(0, 20))
-
-      reader.getMaturity(ctx)
-      .then((maturity) => {
-        ctx.profile.setMaturity(maturity)
-        logger.info('profile.maturity=%o', ctx.profile.maturity)
-        res()
-      })
-    }),
-    new Promise(function(res) {
-      logger.info('get difficulty of %s...', text.substring(0, 20))
-
-      reader.getDifficulty(ctx)
-      .then((difficulty) => {
-        ctx.profile.setDifficulty(difficulty)
-        logger.info('profile.difficulty=%o', ctx.profile.difficulty)
-        res()
-      })
-    })
-  ])
-  .then(() => {
-    return ctx
+    
+    return rl.question(`${prompt}\n\n[opts]: `)
   })
-})
-.then(
-  (ctx) => {
-    logger.info('created profile for given textPath=%o', ctx.textPath)
-    logger.info('save profile to profilePath=%o', ctx.profilePath)
-    return writer.writeText(
-      JSON.stringify(ctx.profile, undefined, 2),
-      ctx.profilePath
-    )
-  }
-)
-.then(
-  () => {
-    logger.info('saved profile')
-  },
-  (err) => {
-    logger.error(err)
-  }
-)
+  .then((argSrc) => {
+    rl.close()
+    return argSrc
+  })
+}
+
+/**
+ * Looping program execution.
+ * 
+ * @param {Map<string[]>} storyIndexes
+ * @param {string|undefined} argSrc
+ * 
+ * @returns {Promise<string>}
+ */
+function main(storyIndexes, argSrc) {
+  // runtime args
+  return config.loadArgs(storyIndexes, argSrc)
+  // update logging and filesystem
+  .then((args) => {
+    // TODO update of root logger level is not affecting child loggers
+    logger.level = args.logLevel
+    logger.debug('root logger.level=%s', logger.level)
+
+    return Promise.all([
+      writer.initDir(args.storiesDir),
+      writer.initDir(args.profilesDir)
+    ])
+    .then(() => args)
+  })
+  // fetch story summaries
+  .then((args) => {
+    /**
+     * @type {Promise<undefined>}
+     */
+    let pFetch
+    if (args.fetchStoriesIndex !== undefined) {
+      // fetch stories from requested index
+      const storiesIndex = si.getStoriesIndex(args.fetchStoriesIndex)
+
+      pFetch = reader.fetchStories(storiesIndex, 3, args.storiesDir)
+      .then((pagedStories) => {
+        logger.info('fetched %s pages of stories from %s', pagedStories.size, storiesIndex)
+      })
+    }
+    else {
+      logger.debug('skip stories fetch')
+      pFetch = Promise.resolve()
+    }
+
+    return pFetch.then(() => args)
+  })
+  // get available story index files
+  .then((args) => {
+    return reader.listFiles(args.storiesDir, /index.json$/)
+    .then((storyIndexPaths) => {
+      logger.debug('loaded %s story index paths', storyIndexPaths.length)
+      return { args, storyIndexPaths }
+    })
+  })
+  // show available local story lists if no story selected,
+  // or fetch story
+  .then(({ args, storyIndexPaths }) => {
+    if (args.story === undefined) {
+      return reader.loadPrompt(
+        reader.PROMPT_BROWSE_STORIES_FILE, 
+        storyIndexPaths.map((storyIndexPath, idx) => {
+          return `- [${idx + 1}] ${storyIndexPath}`
+        }).join('\n')
+      )
+      .then((browseStoriesPrompt) => {
+        console.log(browseStoriesPrompt)
+        return { args, storyText: undefined }
+      })
+    }
+    else {
+      logger.info('page=%s story=%s', args.page, args.story)
+
+      const storyIndexPath = storyIndexPaths[args.page - 1]
+      // name of index to which this page belongs
+      const siNameMatch = storyIndexPath.match(
+        new RegExp(`^${regexpEscape(args.storiesDir)}/?(.+)/page`)
+      )
+      if (siNameMatch === null || siNameMatch.length < 1) {
+        throw new Error(`failed to parse stories index name from ${storyIndexPath}`, {
+          cause: siNameMatch
+        })
+      }
+      const siName = siNameMatch[1]
+      logger.info('story=%s index=%s', args.story, siName)
+
+      // load requested story summary
+      return reader.loadText(storyIndexPath)
+      .then((indexJson) => {
+        /**
+         * @type {Story[]}
+         */
+        const stories = JSON.parse(indexJson).filter((story) => story.id === args.story)
+
+        if (stories.length === 1) {
+          return stories[0]
+        }
+        else {
+          logger.error('unable to load story id=%s from %s', args.story, storyIndexPath)
+          throw new Error(`unable to load story id=${args.story} from ${storyIndexPath}`)
+        }
+      })
+      // download full page to temp file
+      .then((storySummary) => {
+        const tempDir = path.join(`data/temp/${siName}/page-${args.page}/story-${args.story}`)
+        return writer.initDir(tempDir)
+        .then(() => {
+          return writer.downloadWebpage(
+            new URL(storySummary.url), 
+            path.join(tempDir, 'story.html'),
+            true
+          )
+        })
+      })
+      // convert story webpage to full text
+      .then(reader.parseHtml)
+      .then((storyPage) => {
+        /**
+         * @type {si.StoriesIndex}
+         */
+        const storiesIndex = si.getStoriesIndex(siName)
+        let textGenerator = storiesIndex.getStoryText(storyPage)
+        /**
+         * @type {string}
+         */
+        let textFragment, storyText = ''
+        const storyPath = path.join(args.storiesDir, siName, `story-${args.story}`, 'story.txt')
+        return writer.initDir(path.dirname(storyPath))
+        .then(() => {
+          let p = Promise.resolve()
+          while (textFragment = textGenerator.next().value) {
+            p = p.then(() => {
+              storyText += textFragment
+              return writer.writeText(textFragment, storyPath)
+            })
+          }
+          return p
+        })
+        .then(() => {
+          logger.info('saved story=%s length=%s to %s', args.story, storyText.length, storyPath)
+          return { args, storyText }
+        })
+      })
+      .catch((err) => {
+        logger.error(err)
+      })
+      
+      // load story text
+      // let path = 'data/이야기_1번.txt'
+      // return reader.loadText(path, 100)
+      // .then((text) => {
+      //   logger.info('text load from %s passed of length=%s', path, text.length)
+      //   return { text, path }
+      // })
+    }
+  })
+  // create story profile
+  .then(({ args, story }) => {
+    if (story !== undefined) {
+      logger.error('skip create story profile')
+      return undefined
+
+      let ctx = new reader.Context(text, new tp.TextProfile(), path)
+
+      return Promise.all([
+        new Promise(function(res) {
+          logger.info('get maturity of %s...', text.substring(0, 20))
+
+          reader.getMaturity(ctx)
+          .then((maturity) => {
+            ctx.profile.setMaturity(maturity)
+            logger.info('profile.maturity=%o', ctx.profile.maturity)
+            res()
+          })
+        }),
+        new Promise(function(res) {
+          logger.info('get difficulty of %s...', text.substring(0, 20))
+
+          reader.getDifficulty(ctx)
+          .then((difficulty) => {
+            ctx.profile.setDifficulty(difficulty)
+            logger.info('profile.difficulty=%o', ctx.profile.difficulty)
+            res()
+          })
+        })
+      ])
+      .then(() => {
+        return ctx
+      })
+    }
+  })
+  // save profile
+  .then(
+    (ctx) => {
+      if (ctx !== undefined) {
+        logger.info('created profile for given textPath=%o', ctx.textPath)
+        logger.info('save profile to profilePath=%o', ctx.profilePath)
+        return writer.writeText(
+          JSON.stringify(ctx.profile, undefined, 2),
+          ctx.profilePath
+        )
+        .then(() => {
+          logger.info('saved profile')
+        })
+      }
+    }
+  )
+  // fetch next argSrc
+  .then(() => {
+    return getArgSrc()
+  })
+  // loop main
+  .then((argSrc) => main(storyIndexes, argSrc))
+}
+
+// init
+init()
+// main
+.then((storyIndexes) => main(storyIndexes))
 

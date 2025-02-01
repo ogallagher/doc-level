@@ -15,7 +15,7 @@ import {
   READING_DIFFICULTY_PHRASES_MIN as _difficultPhrasesMin
 } from './config.js'
 import { StoriesIndex } from './storiesIndex.js'
-import { downloadWebpage, initDir, writeText } from './writer.js'
+import { downloadWebpage, writeText } from './writer.js'
 
 /**
  * @typedef {import('pino').Logger} Logger
@@ -237,13 +237,10 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
       storiesPath = path.join(storiesParentDir, storiesIndex.name, `page-${pageNumber}`)
       
       // download index webpage
-      return initDir(storiesPath)
-      .then(() => {
-        return downloadWebpage(
-          storiesIndex.getPageUrl(pageNumber).toString(),
-          path.join(storiesPath, 'index.html')
-        )
-      })
+      return downloadWebpage(
+        storiesIndex.getPageUrl(pageNumber).toString(),
+        path.join(storiesPath, 'index.html')
+      )
       // load webpage
       .then((indexPagePath) => {
         return parseHtml(indexPagePath)
@@ -271,13 +268,10 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
           // save story to memory and filesystem
           pagedStories.set(pageNumber, storySummaries)
           writeStoryPromises.push(
-            initDir(storiesPath)
-            .then(() => {
-              return writeText(
-                JSON.stringify(storySummaries, undefined, 2),
-                path.join(storiesPath, 'index.json')
-              )
-            })
+            writeText(
+              JSON.stringify(storySummaries, undefined, 2),
+              path.join(storiesPath, 'index.json')
+            )
           )
 
           storiesCount += storySummaries.length
@@ -455,7 +449,7 @@ export function loadText(textPath, lenMax) {
   .then(
     (text) => {
       text = text.substring(0, lenMax)
-      logger.info('loaded text from %s length=%s', text.length)
+      logger.info('loaded text from %s length=%s', textPath, text.length)
       return text
     },
     (err) => {

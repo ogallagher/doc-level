@@ -8,7 +8,6 @@ import yargs from 'yargs/yargs'
 import path from 'path'
 import { hideBin } from 'yargs/helpers'
 import { StoriesIndex } from './storiesIndex.js'
-import { initDir } from './writer.js'
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -36,44 +35,69 @@ export const READING_DIFFICULTY_PHRASES_MAX = 10
  */
 let logger
 
+export const argParser = yargs()
+.option('log-level', {
+  alias: 'l',
+  type: 'string',
+  description: 'set log level',
+  default: 'info',
+  choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']
+})
+.option('fetch-stories-index', {
+  alias: ['f'],
+  type: 'string',
+  description: 'Fetch stories from a registered index/listing webpage.',
+  // choices are unknown until indexes are initialized
+  choices: undefined
+})
+.option('stories-dir', {
+  alias: 'd',
+  type: 'string',
+  description: 'Local filesystem directory where story lists and texts are saved.',
+  default: path.join('data', 'stories')
+})
+.option('profiles-dir', {
+  alias: 'D',
+  type: 'string',
+  description: 'Local directory where story profiles are saved.',
+  default: path.join('data', 'profiles')
+})
+.option('page', {
+  alias: 'p',
+  type: 'number',
+  description: 'Stories listing page number.',
+  default: 1
+})
+.option('story', {
+  alias: 's',
+  type: 'string',
+  description: 'Story id.'
+})
+.alias('v', 'version')
+.alias('h', 'help')
+
 /**
  * Load runtime arguments.
  * 
  * @param {Map<string, StoriesIndex>} storyIndexes
+ * @param {string|string[]} argSrc Source of runtime arguments. Default is `process.argv`.
  * 
  * @returns {Promise<{
  *  logLevel: string,
- *  fetchStories: string | undefined,
- *  storiesDir: string
+ *  fetchStoriesIndex: string | undefined,
+ *  storiesDir: string,
+ *  profilesDir: string,
+ *  page: number,
+ *  story: string | undefined
  * }>}
  */
-function loadArgs(storyIndexes) {
+export function loadArgs(storyIndexes, argSrc=hideBin(process.argv)) {
   return new Promise(function(res) {
     logger.debug('load runtime args')
 
-    const argv = yargs(hideBin(process.argv))
-    .option('log-level', {
-      alias: 'l',
-      type: 'string',
-      description: 'set log level',
-      default: 'info',
-      choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']
-    })
-    .option('fetch-stories', {
-      alias: 'f',
-      type: 'string',
-      description: 'Fetch stories from a registered index webpage.',
-      choices: storyIndexes
-    })
-    .option('stories-dir', {
-      alias: 'd',
-      type: 'string',
-      description: 'local filesystem directory where story texts are saved',
-      default: path.join('data', 'stories')
-    })
-    .alias('v', 'version')
-    .alias('h', 'help')
-    .parse()
+    const argv = argParser
+    .choices('fetch-stories-index', storyIndexes)
+    .parse(argSrc)
   
     logger.info('loaded runtime args')
     res(argv)
@@ -123,7 +147,7 @@ function loadEnv() {
 }
 
 /**
- * Init module logger, init filesystem, load env and runtime args, connect OpenAI api client.
+ * Init module logger, init filesystem, load env args, connect OpenAI api client.
  * 
  * @param {Logger} parentLogger 
  * @param {Map<string, StoriesIndex>} storyIndexes
@@ -134,12 +158,9 @@ function loadEnv() {
  *  maturityModel: string,
  *  readingDifficultyWordsMax: number,
  *  readingDifficultyPhrasesMax: number
- *  logLevel: string,
- *  storiesIndex: string | undefined,
- *  storiesDir: string
  * }>}
  */
-export function init(parentLogger, storyIndexes) {
+export function init(parentLogger) {
   logger = parentLogger.child(
     {
       name: 'config'
@@ -147,23 +168,16 @@ export function init(parentLogger, storyIndexes) {
   )
 
   return Promise.all([
-    loadEnv(),
-    loadArgs(storyIndexes)
+    loadEnv()
   ])
-  .then(([resEnv, resArgs]) => {
+  .then(([resEnv]) => {
     return new Promise((res) => {
-      // init filesystem
-      initDir(resArgs.storiesDir)
-      
       res({
         ai: resEnv.ai,
         chatModel: resEnv.chatModel,
         maturityModel: resEnv.maturityModel,
         readingDifficultyWordsMax: resEnv.readingDifficultyWordsMax,
-        readingDifficultyPhrasesMax: resEnv.readingDifficultyPhrasesMax,
-        logLevel: resArgs.logLevel,
-        storiesIndex: resArgs.fetchStories,
-        storiesDir: resArgs.storiesDir
+        readingDifficultyPhrasesMax: resEnv.readingDifficultyPhrasesMax
       })
     })
   }) 

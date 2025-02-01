@@ -25,7 +25,7 @@
   "scripts": {
     "test": "mocha test | pino-pretty -L info",
     "coverage": "nyc --reporter=text npm run test",
-    "cli": "node src/index.js -l info | pino-pretty"
+    "cli": "node src/index.js -l warn | pino-pretty"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

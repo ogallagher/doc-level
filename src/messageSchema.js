@@ -1,3 +1,7 @@
+/**
+ * Natural language model structured response schemas.
+ */
+
 import { z } from 'zod'
 /**
  * @typedef {import('pino').Logger} Logger
@@ -89,7 +93,10 @@ Stories.name = 'Stories'
  *  url: string,
  *  excerpts: string[],
  *  id: string
- * }} Story
+ * }} Story Summary story info.
+ * 
+ * Not currently derived from a language model prompt, but rather explicitly parsed from a downloaded stories
+ * index/listing page.
  */
 /**
  * @typedef {{
