@@ -2,14 +2,16 @@ import {
   writeFile, 
   access as fsAccess, 
   constants as fsConstants,
-  mkdir
+  mkdir,
+  appendFile,
+  open
 } from 'fs/promises'
 import { createWriteStream } from 'fs'
 import request from 'request'
 /**
  * @typedef {import('pino').Logger} Logger
  * 
- * @typedef {import('fs').Mode} Mode
+ * @typedef {import('fs/promises').FileHandle} FileHandle
  */
 
 /**
@@ -39,24 +41,32 @@ export function init(parentLogger) {
  * Write file content to local filesystem.
  * 
  * @param {string} text 
- * @param {string} path 
- * @param {Mode|undefined} mode File write mode. Default is overwrite. Pass in O_APPEND to append.
+ * @param {string|FileHandle} path
  * @returns {Promise<undefined>}
  */
-export function writeText(text, path, mode) {
+export function writeText(text, path) {
     return new Promise(function(res, rej) {
-        writeFile(path, text, {encoding: 'utf-8', mode: mode})
-        .then(
-          () => {
-            logger.info('write text to %s passed', path)
-            res()
-          },
-          (err) => {
-            logger.error('write text to %s failed', path)
-            rej(err)
-          }
-        )
+      writeFile(path, text, {encoding: 'utf-8'})
+      .then(
+        () => {
+          logger.trace('write text len=%s to %o passed', text.length, path)
+          res()
+        },
+        (err) => {
+          logger.error('write text len=%s to %o failed'.replace, text.length, path)
+          rej(err)
+        }
+      )
     })
+}
+
+/**
+ * 
+ * @param {string} path 
+ * @returns {Promise<FileHandle>}
+ */
+export function openFile(path) {
+  return open(path, 'w')
 }
 
 export function initDir(path) {
