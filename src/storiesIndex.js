@@ -144,7 +144,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
     static selectorMetaViews = '.hit span'
 
     static selectorStoryText = (
-        '#contents > section.view_section .detail_con > .page_group > .page_breaking > p'
+        '#contents > section.view_section .detail_cont > .page_group > .page_breaking'
     )
     static selectorTextParagraphs = [
         'p.p1',
@@ -236,7 +236,12 @@ export class MunjangStoriesIndex extends StoriesIndex {
         logger.debug('isolate story text at selector=%s', MunjangStoriesIndex.selectorStoryText)
 
         const textEl = storyPage.querySelector(MunjangStoriesIndex.selectorStoryText)
-        const pgraphsEl = textEl.querySelectorAll(MunjangStoriesIndex.selectorTextParagraphs)
+        const pgraphsEl = textEl?.querySelectorAll(MunjangStoriesIndex.selectorTextParagraphs)
+        if (pgraphsEl === undefined || pgraphsEl.length < 1) {
+            throw new Error(`failed to load paragraphs from story page`, {
+                cause: [textEl, pgraphsEl]
+            })
+        }
         logger.info('found %s paragraphs in story text', pgraphsEl.length)
 
         /**
