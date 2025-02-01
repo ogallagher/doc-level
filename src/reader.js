@@ -312,7 +312,12 @@ export function reduceStory(paragraphs, lengthMax) {
       res([])
     }
     else if (paragraphs.length === 1) {
-      res([paragraphs[0].substring(0, lengthMax)])
+      if (paragraphs[0].length < pgLenMin) {
+        res([])
+      }
+      else {
+        res([paragraphs[0].substring(0, lengthMax)])
+      }
     }
     else {
       let hi = 0

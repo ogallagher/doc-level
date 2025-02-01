@@ -251,10 +251,11 @@ export class MunjangStoriesIndex extends StoriesIndex {
         for (let [idx, pgraphEl] of pgraphsEl.entries()) {
             pgraph = pgraphEl.textContent
             .replaceAll(/\s+/g, ' ')
+            .replaceAll(/[“”]/g, '"')
             .trim()
 
             try {
-                if (pgraph.search(/광고 건너뛰기▶｜\s+/) === -1) {
+                if (pgraph.search(/광고 건너뛰기▶｜\s+/) === -1 && pgraph.length > 1) {
                     yield pgraph
                 }
                 else {

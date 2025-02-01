@@ -70,26 +70,22 @@ export function openFile(path) {
 }
 
 export function initDir(path) {
-  return new Promise(function(res, rej) {
-    fsAccess(path, fsConstants.F_OK)
-    .then(
-      () => {
-        logger.debug('dir %s already exists', path)
-      },
-      () => {
-        logger.info('create dir %s', path)
-        return mkdir(path, {
-          recursive: true
-        })
-      }
-    )
-    .then(
-      res,
-      (err) => {
-        logger.error('failed to create dir %s', path)
-        rej(err)
-      }
-    )
+  return fsAccess(path, fsConstants.F_OK)
+  .then(
+    () => {
+      logger.debug('dir %s already exists', path)
+    },
+    () => {
+      logger.info('create dir %s', path)
+      return mkdir(path, {
+        recursive: true
+      })
+    }
+  )
+  .catch((err) => {
+    throw new Error(`failed to create dir ${path}`, {
+      cause: err
+    })
   })
 }
 

@@ -147,6 +147,11 @@ function main(storyIndexes, argSrc) {
      * @type {string[]|undefined}
      */
     let storyText
+    /**
+     * @type {string|undefined}
+     */
+    let storyIndexName
+
     if (args.story === undefined) {
       return reader.loadPrompt(
         reader.PROMPT_BROWSE_STORIES_FILE, 
@@ -156,7 +161,7 @@ function main(storyIndexes, argSrc) {
       )
       .then((browseStoriesPrompt) => {
         console.log(browseStoriesPrompt)
-        return { args, storyText }
+        return { args, story: storyText, storyIndexName }
       })
     }
     else {
@@ -172,8 +177,8 @@ function main(storyIndexes, argSrc) {
           cause: siNameMatch
         })
       }
-      const siName = siNameMatch[1]
-      logger.info('story=%s index=%s', args.story, siName)
+      storyIndexName = siNameMatch[1]
+      logger.info('story=%s index=%s', args.story, storyIndexName)
 
       // load requested story summary
       return reader.loadText(storyIndexPath)
@@ -193,7 +198,7 @@ function main(storyIndexes, argSrc) {
       })
       // download full page to temp file
       .then((storySummary) => {
-        const tempDir = path.join(`data/temp/${siName}/page-${args.page}/story-${args.story}`)
+        const tempDir = path.join(`data/temp/${storyIndexName}/page-${args.page}/story-${args.story}`)
         return writer.initDir(tempDir)
         .then(() => {
           return writer.downloadWebpage(
@@ -209,13 +214,13 @@ function main(storyIndexes, argSrc) {
         /**
          * @type {si.StoriesIndex}
          */
-        const storiesIndex = si.getStoriesIndex(siName)
+        const storiesIndex = si.getStoriesIndex(storyIndexName)
         let textGenerator = storiesIndex.getStoryText(storyPage)
         /**
          * @type {string}
          */
         let textFragment
-        const storyPath = path.join(args.storiesDir, siName, `story-${args.story}`, 'story.txt')
+        const storyPath = path.join(args.storiesDir, storyIndexName, `story-${args.story}`, 'story.txt')
         return writer.initDir(path.dirname(storyPath))
         .then(async () => {
           storyText = []
@@ -230,35 +235,42 @@ function main(storyIndexes, argSrc) {
         })
         .then(() => {
           logger.info('saved story=%s paragraph-count=%s to %s', args.story, storyText.length, storyPath)
-          return { args, storyText }
+          return { args, story: storyText, storyIndexName }
         })
       })
     }
   })
   // reduce story
-  .then(({ args, story }) => {
+  .then(({ args, story, storyIndexName }) => {
     if (story !== undefined) {
       return reader.reduceStory(story, args.storyLengthMax)
       .then((excerpt) => {
         logger.info('reduced story len=%s to excerpt len=%s', story.length, excerpt.length)
-        return {args, excerpt}
+        // save reduced excerpt to local file
+        const excerptFile = path.join(args.profilesDir, storyIndexName, `story-${args.story}`, 'excerpt.txt')
+        return writer.initDir(path.dirname(excerptFile))
+        .then(() => {
+          return writer.writeText(excerpt.join('\n'), excerptFile)
+        })
+        .then(() => {
+          logger.info('saved story=%s excerpt to path=%s', args.story, excerptFile)
+          return {args, text: excerpt.join('\n'), textPath: excerptFile}
+        })
       })
     }
     else {
-      return {args, story}
+      logger.debug('story undefined; skip reduce')
+      return {args, text: undefined, textPath: undefined}
     }
   })
   // create story profile
-  .then(({ args, story }) => {
-    if (story !== undefined) {
-      logger.error('skip create story profile')
-      return undefined
-
-      let ctx = new reader.Context(text, new tp.TextProfile(), path)
+  .then(({ args, text, textPath }) => {
+    if (text !== undefined) {
+      let ctx = new reader.Context(text, new tp.TextProfile(), textPath)
 
       return Promise.all([
         new Promise(function(res) {
-          logger.info('get maturity of %s...', text.substring(0, 20))
+          logger.info('get maturity of %s:%s...', args.story, text.substring(0, 20))
 
           reader.getMaturity(ctx)
           .then((maturity) => {
