@@ -143,6 +143,14 @@ export class MunjangStoriesIndex extends StoriesIndex {
     static selectorMetaDate = '.date span'
     static selectorMetaViews = '.hit span'
 
+    static selectorStoryText = (
+        '#contents > section.view_section .detail_con > .page_group > .page_breaking > p'
+    )
+    static selectorTextParagraphs = [
+        'p.p1',
+        'blockquote'
+    ].join(',')
+
     constructor() {
         super(
             'https://munjang.or.kr/board.es?mid=a20103000000&bid=0003&act=list&ord=RECENT&nPage=1',
@@ -214,6 +222,42 @@ export class MunjangStoriesIndex extends StoriesIndex {
             }
             catch (err) {
                 throw new Error(`failed to parse summary of stories[${idx}]`, {
+                    cause: err
+                })
+            }
+        }
+    }
+
+    /**
+     * @param {HTMLElement} storyPage
+     * @returns {Generator<string>}
+     */
+    *getStoryText(storyPage) {
+        logger.debug('isolate story text at selector=%s', MunjangStoriesIndex.selectorStoryText)
+
+        const textEl = storyPage.querySelector(MunjangStoriesIndex.selectorStoryText)
+        const pgraphsEl = textEl.querySelectorAll(MunjangStoriesIndex.selectorTextParagraphs)
+        logger.info('found %s paragraphs in story text', pgraphsEl.length)
+
+        /**
+         * @type {string}
+         */
+        let pgraph
+        for (let [idx, pgraphEl] of pgraphsEl.entries()) {
+            pgraph = pgraphEl.textContent
+            .replaceAll(/\s+/g, ' ')
+            .trim()
+
+            try {
+                if (pgraph.search(/광고 건너뛰기▶｜\s+/) === -1) {
+                    yield pgraph
+                }
+                else {
+                    logger.debug('skip pgraph[%s] = %s...', idx, pgraph.substring(0, 100))
+                }
+            }
+            catch (err) {
+                throw new Error(`failed to parse paragraph[${idx}]`, {
                     cause: err
                 })
             }
