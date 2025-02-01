@@ -294,6 +294,70 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
 }
 
 /**
+ * 
+ * @param {string[]} paragraphs 
+ * @param {number} lengthMax 
+ * @returns {Promise<string[]>}
+ */
+export function reduceStory(paragraphs, lengthMax) {
+  // minimum length of a paragraph
+  const pgLenMin = 5
+
+  return new Promise((res) => {
+    if (lengthMax < pgLenMin || paragraphs.length < 1) {
+      res([])
+    }
+    else if (paragraphs.length === 1) {
+      res([paragraphs[0].substring(0, lengthMax)])
+    }
+    else {
+      let hi = 0
+      let ti = paragraphs.length - 1
+      let mi = (
+        paragraphs.length > 2 
+        ? Math.floor(paragraphs.length / 2)
+        : undefined
+      )
+  
+      let head = paragraphs[hi]
+      let tail = paragraphs[ti]
+      let mid = (mi !== undefined ? paragraphs[mi] : undefined)
+  
+      let pgLenSum = head.length + tail.length + (mid?.length || 0)
+      if (
+        pgLenSum >= lengthMax 
+        || mid === undefined
+      ) {
+        // truncate ~3 samples and return
+        let pgTrimAvg = (
+          (pgLenSum - lengthMax) / (mid !== undefined ? 3 : 2)
+        )
+        res(
+          [head, mid, tail]
+          .filter((pg) => pg !== undefined)
+          .map((pg) => pg.substring(0, pg.length - pgTrimAvg))
+        )
+      }
+      else {
+        let lenRem = Math.trunc((lengthMax - pgLenSum) / 2)
+        
+        // coallate additional samples
+        Promise.all([
+          reduceStory(paragraphs.slice(hi+1, mi), lenRem),
+          reduceStory(paragraphs.slice(mi+1, ti), lenRem)
+        ])
+        .then(([torso, legs]) => {
+          res(
+            [ head, torso, mid, legs, tail ].flat()
+            .filter((pg) => pg !== undefined)
+          )
+        })
+      }
+    }
+  })
+}
+
+/**
  * Estimate maturity/offensiveness.
  * Since openai.moderations this does not account for curse words (offensive language not
  * directly targeted at anyone), we compensate with a separate chat prompt.

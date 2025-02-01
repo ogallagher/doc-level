@@ -4,7 +4,7 @@ import path from 'path'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
-import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml } from '../src/reader.js'
+import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml, reduceStory } from '../src/reader.js'
 import * as storiesIndex from '../src/storiesIndex.js'
 
 const logger = pino(
@@ -105,6 +105,36 @@ describe('reader', function() {
         let id1_1 = root.querySelector('#id1')
         let id1_2 = root.querySelector('body article').querySelector('p#id1')
         assert.strictEqual(id1_1, id1_2)
+      })
+    })
+  })
+
+  describe('#reduceStory', function() {
+    let pgs = ['aaaaa', 'bbbbb', 'cccccc', 'dddddddddd', 'eeeeee', 'fffffff']
+
+    let pgLenTotal = 0
+    pgs.forEach((pg) => {
+      pgLenTotal += pg.length
+    })
+
+    it('selects equally distributed fragments', function() {
+      return reduceStory(pgs, 18)
+      .then((r) => {
+        let rLen = 0
+        r.forEach((pg) => {
+          rLen += pg.length
+        })
+        logger.info('sample=%o sample-len=%s', r, rLen)
+        assert.ok(rLen <= 18)
+      })
+      .then(() => reduceStory(pgs, pgLenTotal))
+      .then((r) => {
+        let rLen = 0
+        r.forEach((pg) => {
+          rLen += pg.length
+        })
+        logger.info('sample-len=%s population-len=%s sample=%o', rLen, pgLenTotal, r)
+        assert.strictEqual(r.length, pgs.length)  
       })
     })
   })
