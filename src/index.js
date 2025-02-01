@@ -21,6 +21,8 @@ import * as ms from './messageSchema.js'
 import * as writer from './writer.js'
 import * as si from './storiesIndex.js'
 import pino from 'pino'
+import * as readline from 'node:readline/promises'
+import yargs from 'yargs/yargs'
 
 /**
  * @type {pino.Logger}
@@ -32,6 +34,7 @@ const logger = pino(
   }
 )
 
+// init
 Promise.all([
   tp.init(logger),
   ms.init(logger),
@@ -66,37 +69,84 @@ Promise.all([
     })
   }
 )
+// fetch story summaries
 .then(({indexName, storiesDir}) => {
-  let p
   if (indexName !== undefined) {
     // fetch stories from requested index
     const storiesIndex = si.getStoriesIndex(indexName)
-    p = reader.fetchStories(storiesIndex, 3, storiesDir)
+    return reader.fetchStories(storiesIndex, 3, storiesDir)
     .then((pagedStories) => {
       logger.info('fetched %s pages of stories from %s', pagedStories.size, storiesIndex)
-      pagedStories.forEach((stories, page) => {
-        console.log(`page[${page}] = ${JSON.stringify(stories, undefined, 2)}`)
-      })
+      return storiesDir
     })
   }
   else {
-    logger.debug('skip stories fetch')
-    p = Promise.resolve()
+    logger.info('skip stories fetch')
+    return storiesDir
   }
-
-  // TODO resolve path to stories
-  return p.then(() => {
-    throw new Error('stop')
-  })
 })
+// inform available local story lists
+.then(
+  (storiesDir) => {
+    return reader.listFiles(storiesDir, /index.json$/)
+    .then((storyIndexPaths) => {
+      logger.debug('loaded %s story index paths', storyIndexPaths.length)
+      return reader.loadPrompt(
+        reader.PROMPT_BROWSE_STORIES_FILE, 
+        storyIndexPaths.map((storyIndexPath, idx) => {
+          return `- [${idx}] ${storyIndexPath}`
+        }).join('\n')
+      )
+    })
+    .then((browseStoriesPrompt) => {
+      console.log(browseStoriesPrompt)
+    })
+  }
+)
+// loop select and analyze stories
 .then(
   () => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      // output to stderr avoids interfering with pino logger default output to stdout
+      output: process.stderr
+    })
+
+    // TODO loop story selection prompt
+    // TODO use yargs usage and help 
+    return rl.question('story to analyze: ').then((res) => {
+      rl.close()
+      
+      return yargs(res)
+      .hide('version')
+      .alias('h', 'help')
+      .option('page', {
+        alias: 'p',
+        type: 'string',
+        description: 'stories listing page number',
+        default: '0'
+      })
+      .option('story', {
+        alias: 's',
+        type: 'string',
+        description: 'story id'
+      })
+      .parse()
+    })
+  }
+)
+.then(
+  (pageStoryRes) => {
+    logger.info('page=%s story=%s', pageStoryRes.page, pageStoryRes.story)
+
+    throw new Error('stop')
     // load story text
     let path = 'data/이야기_1번.txt'
     return reader.loadText(path, 100)
     .then((text) => {return { text, path }})
   }
 )
+// analyze stories
 .then(({ text, path }) => {
   logger.info('text load from %s passed of length=%s', path, text.length)
   let ctx = new reader.Context(text, new tp.TextProfile(), path)
