@@ -44,11 +44,17 @@ export const argParser = yargs()
   choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']
 })
 .option('fetch-stories-index', {
-  alias: ['f'],
+  alias: 'f',
   type: 'string',
   description: 'Fetch stories from a registered index/listing webpage.',
   // choices are unknown until indexes are initialized
   choices: undefined
+})
+.option('fetch-stories-max', {
+  alias: 'm',
+  type: 'number',
+  description: 'Max number of stories to fetch.',
+  default: 10
 })
 .option('stories-dir', {
   alias: 'd',
@@ -73,6 +79,12 @@ export const argParser = yargs()
   type: 'string',
   description: 'Story id.'
 })
+.option('story-length-max', {
+  alias: 'n',
+  type: 'number',
+  description: 'Max character length of story text to include when generating its profile.',
+  default: 2000
+})
 .alias('v', 'version')
 .alias('h', 'help')
 
@@ -85,10 +97,12 @@ export const argParser = yargs()
  * @returns {Promise<{
  *  logLevel: string,
  *  fetchStoriesIndex: string | undefined,
+ *  fetchStoriesMax: number,
  *  storiesDir: string,
  *  profilesDir: string,
  *  page: number,
- *  story: string | undefined
+ *  story: string | undefined,
+ *  storyLengthMax: number
  * }>}
  */
 export function loadArgs(storyIndexes, argSrc=hideBin(process.argv)) {
