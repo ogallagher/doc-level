@@ -171,7 +171,13 @@ export class MunjangStoriesIndex extends StoriesIndex {
                 ).textContent
                 .replace(/&lsquo.+&rsquo;\s+/, '')
                 .replace(/광고 건너뛰기▶｜\s+/, '')
+                .replaceAll(/[\r\n]+\s+/g, ' ')
                 .trim()
+
+                const url = new URL(path.join(
+                    this.urlTemplate.origin,
+                    storyEl.querySelector(MunjangStoriesIndex.selectorStoryUrl).getAttribute('href')
+                ))
                 
                 /**
                  * @type {Story}
@@ -182,13 +188,11 @@ export class MunjangStoriesIndex extends StoriesIndex {
                     publishDate: new Date(meta.querySelector(MunjangStoriesIndex.selectorMetaDate).textContent),
                     viewCount: parseInt(meta.querySelector(MunjangStoriesIndex.selectorMetaViews).textContent),
                     // concatenate origin (root without path) and story path
-                    url: path.join(
-                        this.urlTemplate.origin,
-                        storyEl.querySelector(MunjangStoriesIndex.selectorStoryUrl).getAttribute('href')
-                    ),
+                    url: url,
                     excerpts: [
                         excerpt
-                    ]
+                    ],
+                    id: url.searchParams.get('list_no')
                 }
                 logger.debug('stories[%s] summary object=%o', idx, storySummary)
 

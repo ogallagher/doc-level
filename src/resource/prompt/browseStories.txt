@@ -1,0 +1,6 @@
+See below local story list files to browse stories.
+Input a listing page + story id in the format "-p <page> -s <story>" download the full text and generate its profile. If page is omitted, the default is "-p 0". 
+Input any other value to quit.
+
+Story lists:
+{0}

@@ -4,7 +4,7 @@ import {
   constants as fsConstants,
   mkdir
 } from 'fs/promises'
-import { createReadStream, createWriteStream } from 'fs'
+import { createWriteStream } from 'fs'
 import request from 'request'
 /**
  * @typedef {import('pino').Logger} Logger
@@ -85,17 +85,41 @@ export function initDir(path) {
  * 
  * @param {URL} url 
  * @param {string} localPath 
+ * @param {boolean} skipIfFileExists
  * @returns {string} Path to downloaded file.
  */
-export function downloadWebpage(url, localPath) {
+export function downloadWebpage(url, localPath, skipIfFileExists=true) {
   return new Promise(function(res, rej) {
-    request.get(url.toString())
-    .pipe(
-      createWriteStream(localPath)
-      .on('error', rej)
-      .on('close', () => {
-        res(localPath)
-      })
+    fsAccess(localPath, fsConstants.F_OK)
+    .then(
+      () => {
+        if (skipIfFileExists) {
+          logger.info('local-path=%s already exists for url=%s; skip download', localPath, url)
+          return false
+        }
+        else {
+          return true
+        }
+      },
+      () => {
+        logger.debug('local-path=%s does not yet exist for url=%s', localPath, url)
+        return true
+      }
     )
+    .then((doDownload) => {
+      if (doDownload) {
+        request.get(url.toString())
+        .pipe(
+          createWriteStream(localPath)
+          .on('error', rej)
+          .on('close', () => {
+            res(localPath)
+          })
+        )
+      }
+      else {
+        res(localPath)
+      }
+    })
   })
 }

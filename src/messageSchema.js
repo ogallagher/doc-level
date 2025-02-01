@@ -87,7 +87,8 @@ Stories.name = 'Stories'
  *  publishDate: Date,
  *  viewCount: number,
  *  url: string,
- *  excerpts: string[]
+ *  excerpts: string[],
+ *  id: string
  * }} Story
  */
 /**
