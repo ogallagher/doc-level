@@ -4,10 +4,10 @@
 
 import { zodResponseFormat } from 'openai/helpers/zod'
 import path from 'path'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import * as HtmlParser from 'node-html-parser'
 import { Maturity, TextProfile, Difficulty, MATURITY_TYPE_PROFANE } from './textProfile.js'
-import { CustomMaturityTypes, ReadingDifficulty, Stories } from './messageSchema.js'
+import { CustomMaturityTypes, ReadingDifficulty } from './messageSchema.js'
 import { formatString } from './stringUtil.js'
 import {
   READING_DIFFICULTY_REASONS_MAX as _difficultReasonsMax,
@@ -31,9 +31,11 @@ import { downloadWebpage, initDir, writeText } from './writer.js'
  */
 
 let PROMPT_DIR = path.join(import.meta.dirname, 'resource/prompt')
+// prompts for ai language model
 export const PROMPT_CUSTOM_MATURITY_FILE = 'customMaturity.txt'
 export const PROMPT_READING_DIFFICULTY_FILE = 'readingDifficulty.txt'
-export const PROMPT_EXTRACT_STORIES_FILE = 'extractStories.txt'
+// prompts for human user
+export const PROMPT_BROWSE_STORIES_FILE = 'browseStories.txt'
 
 /**
  * @type {Logger}
@@ -230,57 +232,59 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
   /**
    * @type {Promise[]}
    */
-  let fetchStory = (prompt) => {
+  let fetchStory = () => {
     if (storiesCount < storiesMax && pageNumber < storiesIndex.pageNumberMax) {
       storiesPath = path.join(storiesParentDir, storiesIndex.name, `page-${pageNumber}`)
       
-      initDir(storiesPath).then(() => {
+      // download index webpage
+      return initDir(storiesPath)
+      .then(() => {
         return downloadWebpage(
           storiesIndex.getPageUrl(pageNumber).toString(),
           path.join(storiesPath, 'index.html')
         )
       })
+      // load webpage
       .then((indexPagePath) => {
-        return readFile(indexPagePath, {encoding: 'utf-8'})
+        return parseHtml(indexPagePath)
       })
-      .then((indexPage) => {
-        getChatResponse(
-          formatString(prompt, storiesRemaining()),
-          indexPage,
-          Stories
-        )
+      // extract story summaries
+      .then((pageHtml) => {
+        return storiesIndex.getStorySummaries(pageHtml)
       })
-      /*
-      return getChatResponse(
-        formatString(prompt, storiesRemaining()),
-        storiesIndex.getPageUrl(pageNumber).toString(),
-        Stories
-      )
-      */
       .then(
-        /**
-         * @param {ExtractStoriesResponse} storiesResponse 
-         */
-        (storiesResponse) => {
-          logger.info('fetched %s stories from page %s', storiesResponse.stories.length, pageNumber)
+        (storySummariesGenerator) => {
+          let storySummaries = []
+          /**
+           * @type {Story}
+           */
+          let storySummary
+          for (
+            let i = 0; 
+            i < storiesRemaining() && (storySummary = storySummariesGenerator.next().value); 
+            i++
+          ) {
+            storySummaries.push(storySummary)
+          }
+          logger.info('fetched %s stories from page %s', storySummaries.length, pageNumber)
           
           // save story to memory and filesystem
-          pagedStories.set(pageNumber, storiesResponse.stories)
+          pagedStories.set(pageNumber, storySummaries)
           writeStoryPromises.push(
             initDir(storiesPath)
             .then(() => {
               return writeText(
-                JSON.stringify(storiesResponse, undefined, 2),
+                JSON.stringify(storySummaries, undefined, 2),
                 path.join(storiesPath, 'index.json')
               )
             })
           )
 
-          storiesCount += storiesResponse.stories.length
+          storiesCount += storySummaries.length
           pageNumber++
 
-          // recursive call to loop
-          return fetchStory(prompt)
+          // recursive call for next page
+          return fetchStory()
         }
       )
     }
@@ -289,9 +293,7 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
     }
   }
 
-  // TODO Edit prompt to handle reduced task complexity
-  return loadPrompt(PROMPT_EXTRACT_STORIES_FILE)
-  .then(fetchStory)
+  return fetchStory()
   .then(() => {
     return pagedStories
   })
@@ -490,4 +492,35 @@ export function parseHtml(htmlPath) {
 
 export function setPromptDir(promptDir) {
   PROMPT_DIR = promptDir
+}
+
+/**
+ * 
+ * @param {string} dir 
+ * @param {RegExp} pattern 
+ * @returns {Promise<string[]>}
+ */
+export function listFiles(dir, pattern) {
+  return readdir(dir, {
+    recursive: true,
+    withFileTypes: true
+  })
+  .then(
+    (fileEntries) => {
+      const filePaths = []
+      let filePath
+      for (let fileEntry of fileEntries) {
+        filePath = path.join(fileEntry.parentPath, fileEntry.name)
+        if (fileEntry.isFile() && filePath.search(pattern) !== -1) {
+          filePaths.push(filePath)
+        }
+      }
+      return filePaths
+    },
+    (err) => {
+      throw new Error(`failed to list files in ${dir}`, {
+        cause: err
+      })
+    }
+  )
 }
