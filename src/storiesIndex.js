@@ -20,10 +20,10 @@ const storiesIndexes = new Map()
  * Init module logger, create stories indexes.
  * 
  * @param {Logger} parentLogger
- * @returns {Promise<string[]>}
+ * @returns {Promise<undefined>}
  */
 export function init(parentLogger) {
-  return new Promise(function(res) {
+  return new Promise((res) => {
     logger = parentLogger.child(
       {
         name: 'stories-index'
@@ -34,8 +34,13 @@ export function init(parentLogger) {
     new MunjangStoriesIndex()
     
     logger.debug('end init')
-    res(Array.from(storiesIndexes.keys()))
+    res()
   })
+}
+
+export function getStoryIndexNames() {
+    logger.info('storyIndexNames=%o', [...storiesIndexes.keys()])
+    return [...storiesIndexes.keys()]
 }
 
 /**

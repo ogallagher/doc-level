@@ -10,7 +10,6 @@ import * as writer from './writer.js'
 import * as si from './storiesIndex.js'
 import pino from 'pino'
 import * as readline from 'node:readline/promises'
-import yargs from 'yargs/yargs'
 import path from 'path'
 import { regexpEscape, fileString } from './stringUtil.js'
 /**
@@ -29,7 +28,7 @@ const logger = pino(
 
 /**
  * 
- * @returns {Promise<Map<string, StoriesIndex>>}
+ * @returns {Promise<undefined>}
  */
 function init() {
   return Promise.all([
@@ -39,9 +38,8 @@ function init() {
     si.init(logger)
   ])
   // config
-  .then(([, , , siIndexes]) => {
-    logger.info('story indexes = %o', siIndexes)
-    return config.init(logger, siIndexes)
+  .then(() => {
+    return config.init(logger)
     // init modules dependent on config
     .then(
       ({ 
@@ -55,12 +53,13 @@ function init() {
           chatModel,
           maturityModel
         )
+
+        config.argParser.choices('fetch-stories-index', si.getStoryIndexNames())
       
         return reader
         .init(logger, ai, chatModel, maturityModel, readingDifficultyWordsMax, readingDifficultyPhrasesMax)
       }
     )
-    .then(() => siIndexes)
   })
 }
 
@@ -88,14 +87,13 @@ function getArgSrc() {
 /**
  * Looping program execution.
  * 
- * @param {Map<string[]>} storyIndexes
  * @param {string|undefined} argSrc
  * 
  * @returns {Promise<string>}
  */
-function main(storyIndexes, argSrc) {
+function main(argSrc) {
   // runtime args
-  return config.loadArgs(storyIndexes, argSrc)
+  return config.loadArgs(argSrc)
   // update logging and filesystem
   .then((args) => {
     // TODO update of root logger level is not affecting child loggers
@@ -325,15 +323,13 @@ function main(storyIndexes, argSrc) {
     }
   )
   // fetch next argSrc
-  .then(() => {
-    return getArgSrc()
-  })
+  .then(getArgSrc)
   // loop main
-  .then((argSrc) => main(storyIndexes, argSrc))
+  .then(main)
 }
 
 // init
 init()
 // main
-.then((storyIndexes) => main(storyIndexes))
+.then(main)
 

@@ -29,6 +29,8 @@ export const READING_DIFFICULTY_WORDS_MIN = 10
 export const READING_DIFFICULTY_WORDS_MAX = 30
 export const READING_DIFFICULTY_PHRASES_MIN = 3
 export const READING_DIFFICULTY_PHRASES_MAX = 10
+export const TOPICS_MAX = 6
+export const TOPIC_EXAMPLES_MAX = 10
 
 /**
  * @type {Logger}
@@ -96,7 +98,6 @@ export const argParser = yargs()
 /**
  * Load runtime arguments.
  * 
- * @param {Map<string, StoriesIndex>} storyIndexes
  * @param {string|string[]} argSrc Source of runtime arguments. Default is `process.argv`.
  * 
  * @returns {Promise<{
@@ -111,13 +112,11 @@ export const argParser = yargs()
  *  skipProfile: boolean
  * }>}
  */
-export function loadArgs(storyIndexes, argSrc=hideBin(process.argv)) {
+export function loadArgs(argSrc=hideBin(process.argv)) {
   return new Promise(function(res) {
     logger.debug('load runtime args')
 
-    const argv = argParser
-    .choices('fetch-stories-index', storyIndexes)
-    .parse(argSrc)
+    const argv = argParser.parse(argSrc)
   
     logger.info('loaded runtime args')
     res(argv)
@@ -136,7 +135,7 @@ export function loadArgs(storyIndexes, argSrc=hideBin(process.argv)) {
  * }>}
  */
 function loadEnv() {
-  return new Promise(function(res, rej) {
+  return new Promise((res) => {
     logger.debug('load env vars from .env')
     dotenv.config()
   
@@ -145,7 +144,7 @@ function loadEnv() {
     const readingDifficultyWordsMax = process.env[ENV_KEY_READING_DIFFICULTY_WORDS_MAX] || READING_DIFFICULTY_WORDS_MAX
     const readingDifficultyPhrasesMax = process.env[ENV_KEY_READING_DIFFICULTY_PHRASES_MAX] || READING_DIFFICULTY_PHRASES_MAX
     if (openaiApiKey == undefined) {
-      rej(`missing env var ${ENV_KEY_OPENAI_API_KEY}`)
+      throw new Error(`missing env var ${ENV_KEY_OPENAI_API_KEY}`)
     }
     else {
       logger.info('loaded env vars')
@@ -187,18 +186,15 @@ export function init(parentLogger) {
     }
   )
 
-  return Promise.all([
-    loadEnv()
-  ])
-  .then(([resEnv]) => {
-    return new Promise((res) => {
-      res({
-        ai: resEnv.ai,
-        chatModel: resEnv.chatModel,
-        maturityModel: resEnv.maturityModel,
-        readingDifficultyWordsMax: resEnv.readingDifficultyWordsMax,
-        readingDifficultyPhrasesMax: resEnv.readingDifficultyPhrasesMax
-      })
-    })
+  return loadEnv()
+  .then((resEnv) => {
+    logger.debug('end init')
+    return {
+      ai: resEnv.ai,
+      chatModel: resEnv.chatModel,
+      maturityModel: resEnv.maturityModel,
+      readingDifficultyWordsMax: resEnv.readingDifficultyWordsMax,
+      readingDifficultyPhrasesMax: resEnv.readingDifficultyPhrasesMax
+    }
   }) 
 }
