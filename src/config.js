@@ -85,6 +85,11 @@ export const argParser = yargs()
   description: 'Max character length of story text to include when generating its profile.',
   default: 2000
 })
+.option('skip-profile', {
+  alias: '0',
+  type: 'boolean',
+  description: 'Even if a story is selected, do not generate a profile for it.'
+})
 .alias('v', 'version')
 .alias('h', 'help')
 
@@ -102,7 +107,8 @@ export const argParser = yargs()
  *  profilesDir: string,
  *  page: number,
  *  story: string | undefined,
- *  storyLengthMax: number
+ *  storyLengthMax: number,
+ *  skipProfile: boolean
  * }>}
  */
 export function loadArgs(storyIndexes, argSrc=hideBin(process.argv)) {

@@ -2,8 +2,6 @@
  * doc-level entrypoint.
  */
 
-// TODO edit readingDifficulty.txt to specify native language reader difficulty; it seems to overestimate.
-
 import * as config from './config.js'
 import * as reader from './reader.js'
 import * as tp from './textProfile.js'
@@ -14,7 +12,7 @@ import pino from 'pino'
 import * as readline from 'node:readline/promises'
 import yargs from 'yargs/yargs'
 import path from 'path'
-import { regexpEscape } from './stringUtil.js'
+import { regexpEscape, fileString } from './stringUtil.js'
 /**
  * @typedef {import('./storiesIndex.js').Story} Story
  */
@@ -151,6 +149,10 @@ function main(storyIndexes, argSrc) {
      * @type {string|undefined}
      */
     let storyIndexName
+    /**
+     * @type {Story|undefined}
+     */
+    let storySummary
 
     if (args.story === undefined) {
       return reader.loadPrompt(
@@ -161,7 +163,7 @@ function main(storyIndexes, argSrc) {
       )
       .then((browseStoriesPrompt) => {
         console.log(browseStoriesPrompt)
-        return { args, story: storyText, storyIndexName }
+        return { args, story: storyText, storyIndexName, storySummary }
       })
     }
     else {
@@ -189,7 +191,7 @@ function main(storyIndexes, argSrc) {
         const stories = JSON.parse(indexJson).filter((story) => story.id === args.story)
 
         if (stories.length === 1) {
-          return stories[0]
+          storySummary = stories[0]
         }
         else {
           logger.error('unable to load story id=%s from %s', args.story, storyIndexPath)
@@ -197,13 +199,13 @@ function main(storyIndexes, argSrc) {
         }
       })
       // download full page to temp file
-      .then((storySummary) => {
+      .then(() => {
         const tempDir = path.join(`data/temp/${storyIndexName}/page-${args.page}/story-${args.story}`)
         return writer.initDir(tempDir)
         .then(() => {
           return writer.downloadWebpage(
             new URL(storySummary.url), 
-            path.join(tempDir, 'story.html'),
+            path.join(tempDir, `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.html`),
             true
           )
         })
@@ -220,7 +222,10 @@ function main(storyIndexes, argSrc) {
          * @type {string}
          */
         let textFragment
-        const storyPath = path.join(args.storiesDir, storyIndexName, `story-${args.story}`, 'story.txt')
+        const storyPath = path.join(
+          args.storiesDir, storyIndexName, `story-${args.story}`, 
+          `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.txt`
+        )
         return writer.initDir(path.dirname(storyPath))
         .then(async () => {
           storyText = []
@@ -235,19 +240,22 @@ function main(storyIndexes, argSrc) {
         })
         .then(() => {
           logger.info('saved story=%s paragraph-count=%s to %s', args.story, storyText.length, storyPath)
-          return { args, story: storyText, storyIndexName }
+          return { args, story: storyText, storyIndexName, storySummary }
         })
       })
     }
   })
   // reduce story
-  .then(({ args, story, storyIndexName }) => {
+  .then(({ args, story, storyIndexName, storySummary }) => {
     if (story !== undefined) {
       return reader.reduceStory(story, args.storyLengthMax)
       .then((excerpt) => {
         logger.info('reduced story len=%s to excerpt len=%s', story.length, excerpt.length)
         // save reduced excerpt to local file
-        const excerptFile = path.join(args.profilesDir, storyIndexName, `story-${args.story}`, 'excerpt.txt')
+        const excerptFile = path.join(
+          args.profilesDir, storyIndexName, `story-${args.story}`, 
+          `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}_excerpt.txt`
+        )
         return writer.initDir(path.dirname(excerptFile))
         .then(() => {
           return writer.writeText(excerpt.join('\n'), excerptFile)
@@ -266,33 +274,38 @@ function main(storyIndexes, argSrc) {
   // create story profile
   .then(({ args, text, textPath }) => {
     if (text !== undefined) {
-      let ctx = new reader.Context(text, new tp.TextProfile(), textPath)
+      if (!args.skipProfile) {
+        let ctx = new reader.Context(text, new tp.TextProfile(), textPath)
 
-      return Promise.all([
-        new Promise(function(res) {
-          logger.info('get maturity of %s:%s...', args.story, text.substring(0, 20))
+        return Promise.all([
+          new Promise(function(res) {
+            logger.info('get maturity of %s:%s...', args.story, text.substring(0, 20))
 
-          reader.getMaturity(ctx)
-          .then((maturity) => {
-            ctx.profile.setMaturity(maturity)
-            logger.info('profile.maturity=%o', ctx.profile.maturity)
-            res()
+            reader.getMaturity(ctx)
+            .then((maturity) => {
+              ctx.profile.setMaturity(maturity)
+              logger.info('profile.maturity=%o', ctx.profile.maturity)
+              res()
+            })
+          }),
+          new Promise(function(res) {
+            logger.info('get difficulty of %s...', text.substring(0, 20))
+
+            reader.getDifficulty(ctx)
+            .then((difficulty) => {
+              ctx.profile.setDifficulty(difficulty)
+              logger.info('profile.difficulty=%o', ctx.profile.difficulty)
+              res()
+            })
           })
-        }),
-        new Promise(function(res) {
-          logger.info('get difficulty of %s...', text.substring(0, 20))
-
-          reader.getDifficulty(ctx)
-          .then((difficulty) => {
-            ctx.profile.setDifficulty(difficulty)
-            logger.info('profile.difficulty=%o', ctx.profile.difficulty)
-            res()
-          })
+        ])
+        .then(() => {
+          return ctx
         })
-      ])
-      .then(() => {
-        return ctx
-      })
+      }
+      else {
+        logger.info('skip generate profile of story=%s path=%s', args.story, textPath)
+      }
     }
   })
   // save profile

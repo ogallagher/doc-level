@@ -1,3 +1,5 @@
+import sanitizeFilename from 'sanitize-filename'
+
 /**
  * Taken from https://stackoverflow.com/a/4673436/10200417
  */
@@ -17,4 +19,9 @@ export function formatString(str, ...args) {
  */
 export function regexpEscape(str) {
   return str.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+export function fileString(str) {
+  return sanitizeFilename(str)
+  .replace(/\s+/g, '-')
 }
