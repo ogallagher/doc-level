@@ -74,6 +74,22 @@ ReadingDifficulty.name = 'ReadingDifficulty'
  * }} ReadingDifficultyResponse
  */
 
+export let Topics = z.object({
+  topics: z.array(z.object({
+    id: z.string(),
+    examples: z.array(z.string())
+  }))
+})
+Topics.name = 'Topics'
+/**
+ * @typedef {{
+ *  topics: {
+ *    id: string,
+ *    examples: string[]
+ *  }[]
+ * }} TopicsResponse
+ */
+
 export let Stories = z.object({
   stories: z.array(z.object({
     authorName: z.string(),

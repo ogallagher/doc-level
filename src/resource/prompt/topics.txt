@@ -1,0 +1,1 @@
+You are identifying genres/topics/themes in short story excerpts. Provide the result "topics" as an array of up to {0} identified topics, each element having the following values: "id" (lowercase hyphenated topic name), "examples" (list of up to {1} example phrases that mention the topic in the text).

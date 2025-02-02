@@ -58,7 +58,7 @@ export class Maturity {
 }
 
 /**
- * @extends ReadingDifficultyResponse
+ * Reading difficulty.
  */
 export class Difficulty {
   constructor(yearsOfEducation=0, readingLevelName, reasons=[], difficultWords=[], difficultPhrases=[]) {
@@ -76,6 +76,19 @@ export class Difficulty {
   }
 }
 
+export class Topic {
+  constructor(id, examplePhrases=[]) {
+    /**
+     * @type {string}
+     */
+    this.id = id
+    /**
+     * @type {string[]}
+     */
+    this.examplePhrases = examplePhrases
+  }
+}
+
 export class TextProfile {
   constructor() {
     /**
@@ -83,6 +96,10 @@ export class TextProfile {
      */
     this.maturity = new Maturity()
     this.difficulty = new Difficulty()
+    /**
+     * @type {Topic[]}
+     */
+    this.topics = []
   }
   
   setMaturity(maturity) {
@@ -91,5 +108,9 @@ export class TextProfile {
 
   setDifficulty(difficulty) {
     this.difficulty = difficulty
+  }
+
+  setTopics(topics) {
+    this.topics = topics
   }
 }

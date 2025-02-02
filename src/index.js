@@ -55,7 +55,7 @@ function init() {
         )
 
         config.argParser.choices('fetch-stories-index', si.getStoryIndexNames())
-      
+
         return reader
         .init(logger, ai, chatModel, maturityModel, readingDifficultyWordsMax, readingDifficultyPhrasesMax)
       }
@@ -293,6 +293,16 @@ function main(argSrc) {
             .then((difficulty) => {
               ctx.profile.setDifficulty(difficulty)
               logger.info('profile.difficulty=%o', ctx.profile.difficulty)
+              res()
+            })
+          }),
+          new Promise((res) => {
+            logger.info('get topics in %s:%s...', args.story, text.substring(0, 20))
+
+            return reader.getTopics(ctx)
+            .then((topics) => {
+              ctx.profile.setTopics(topics)
+              logger.info('profile.topics=%o', ctx.profile.topics)
               res()
             })
           })

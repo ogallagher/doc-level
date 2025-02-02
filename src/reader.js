@@ -6,13 +6,15 @@ import { zodResponseFormat } from 'openai/helpers/zod'
 import path from 'path'
 import { readFile, readdir } from 'node:fs/promises'
 import * as HtmlParser from 'node-html-parser'
-import { Maturity, TextProfile, Difficulty, MATURITY_TYPE_PROFANE } from './textProfile.js'
-import { CustomMaturityTypes, ReadingDifficulty } from './messageSchema.js'
+import { Maturity, TextProfile, Difficulty, Topic, MATURITY_TYPE_PROFANE } from './textProfile.js'
+import { CustomMaturityTypes, ReadingDifficulty, Topics } from './messageSchema.js'
 import { formatString } from './stringUtil.js'
 import {
   READING_DIFFICULTY_REASONS_MAX as _difficultReasonsMax,
   READING_DIFFICULTY_WORDS_MIN as _difficultWordsMin,
-  READING_DIFFICULTY_PHRASES_MIN as _difficultPhrasesMin
+  READING_DIFFICULTY_PHRASES_MIN as _difficultPhrasesMin,
+  TOPICS_MAX as _topicsMax,
+  TOPIC_EXAMPLES_MAX as _topicExamplesMax
 } from './config.js'
 import { StoriesIndex } from './storiesIndex.js'
 import { downloadWebpage, writeText } from './writer.js'
@@ -27,6 +29,7 @@ import { downloadWebpage, writeText } from './writer.js'
  * @typedef {import('./messageSchema.js').CustomMaturityTypesResponse} CustomMaturityTypesResponse
  * @typedef {import('./messageSchema.js').ReadingDifficultyResponse} ReadingDifficultyResponse
  * @typedef {import('./messageSchema.js').ExtractStoriesResponse} ExtractStoriesResponse
+ * @typedef {import('./messageSchema.js').TopicsResponse} TopicsResponse
  * @typedef {import('./messageSchema.js').Story} Story
  */
 
@@ -34,6 +37,7 @@ let PROMPT_DIR = path.join(import.meta.dirname, 'resource/prompt')
 // prompts for ai language model
 export const PROMPT_CUSTOM_MATURITY_FILE = 'customMaturity.txt'
 export const PROMPT_READING_DIFFICULTY_FILE = 'readingDifficulty.txt'
+export const PROMPT_TOPICS_FILE = 'topics.txt'
 // prompts for human user
 export const PROMPT_BROWSE_STORIES_FILE = 'browseStories.txt'
 
@@ -459,7 +463,7 @@ export function getMaturity(ctx) {
 }
 
 /**
- * Estimate readoing difficulty.
+ * Estimate reading difficulty.
  * 
  * @param {Context} ctx 
  * 
@@ -507,8 +511,37 @@ export function getPoliticalBias(ctx) {
   
 }
 
-export function getCategories(ctx) {
-  
+/**
+ * Identify topics/genres/categories.
+ * 
+ * @param {Context} ctx 
+ * 
+ * @returns {Promise<Topic[]>}
+ */
+export function getTopics(ctx) {
+  return loadPrompt(
+    PROMPT_TOPICS_FILE,
+    _topicsMax,
+    _topicExamplesMax
+  )
+  .then(
+    /**
+     * @param {string} topicsPrompt 
+     * @returns {Promise<TopicsResponse>}
+     */
+    (topicsPrompt) => {
+      return getChatResponse(
+        topicsPrompt,
+        ctx.text,
+        Topics
+      )
+    }
+  )
+  .then((topicsResponse) => {
+    return topicsResponse.topics.map((topicData) => {
+      return new Topic(topicData.id, topicData.examples)
+    })
+  })
 }
 
 /**
