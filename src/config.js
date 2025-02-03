@@ -85,7 +85,7 @@ export const argParser = yargs()
   alias: 'n',
   type: 'number',
   description: 'Max character length of story text to include when generating its profile.',
-  default: 2000
+  default: 3500
 })
 .option('skip-profile', {
   alias: '0',

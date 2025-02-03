@@ -17,7 +17,7 @@ import {
   TOPIC_EXAMPLES_MAX as _topicExamplesMax
 } from './config.js'
 import { StoriesIndex } from './storiesIndex.js'
-import { downloadWebpage, writeText } from './writer.js'
+import { downloadWebpage, fileExists, initDir, writeText } from './writer.js'
 
 /**
  * @typedef {import('pino').Logger} Logger
@@ -215,7 +215,8 @@ export function loadPrompt(templatePath, ...args) {
  * Fetch story summaries from an index/listing online.
  * 
  * @param {StoriesIndex} storiesIndex 
- * @param {number} storiesMax 
+ * @param {number} storiesMax Max count of stories to fetch. Note the actual count of stories returned
+ * will be rounded up to nearest whole page.
  * @param {string} storiesParentDir 
  * @returns {Promise<Map<number, Story[]>>} Paged list of stories.
  */
@@ -223,7 +224,6 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
   logger.info('fetch up to %s stories from %s and save to %s', storiesMax, storiesIndex, storiesParentDir)
   let pageNumber = storiesIndex.pageNumberMin
   let storiesCount = 0
-  let storiesRemaining = () => {return storiesMax - storiesCount}
   /**
    * @type {Map<number, Story[]>}
    */
@@ -231,64 +231,82 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
   /**
    * @type {string}
    */
-  let storiesPath
+  let storiesDir
+  /**
+   * @type {string}
+   */
+  let storiesIndexPath
   let writeStoryPromises = []
+  /**
+   * @type {Story[]}
+   */
+  let storySummaries
   /**
    * @type {Promise[]}
    */
-  let fetchStory = () => {
-    if (storiesCount < storiesMax && pageNumber < storiesIndex.pageNumberMax) {
-      storiesPath = path.join(storiesParentDir, storiesIndex.name, `page-${pageNumber}`)
+  let fetchStory = async () => {
+    if (storiesCount < storiesMax && pageNumber <= storiesIndex.pageNumberMax) {
+      storiesDir = path.join(storiesParentDir, storiesIndex.name, `page-${pageNumber}`)
+      await initDir(storiesDir)
+      storiesIndexPath = path.join(storiesDir, 'index.json')
+
+      storySummaries = []
       
-      // download index webpage
-      return downloadWebpage(
-        storiesIndex.getPageUrl(pageNumber).toString(),
-        path.join(storiesPath, 'index.html')
-      )
-      // load webpage
-      .then((indexPagePath) => {
-        return parseHtml(indexPagePath)
-      })
-      // extract story summaries
-      .then((pageHtml) => {
-        return storiesIndex.getStorySummaries(pageHtml)
-      })
-      .then(
-        /**
-         * 
-         * @param {Generator<Story>} storySummariesGenerator
-         */
-        (storySummariesGenerator) => {
-          let storySummaries = []
+      if (await fileExists(storiesIndexPath)) {
+        // load count of stories from local page
+        storySummaries = await loadText(storiesIndexPath).then(JSON.parse)
+        logger.info(
+          'local stories index=%s page=%s story-count=%s already exists; skip to next', 
+          storiesIndex.name, pageNumber, storySummaries.length
+        )
+      }
+      else {
+        // download index webpage
+        await downloadWebpage(
+          storiesIndex.getPageUrl(pageNumber).toString(),
+          path.join(storiesDir, 'index.html')
+        )
+        // load webpage
+        .then((indexPagePath) => {
+          return parseHtml(indexPagePath)
+        })
+        // extract story summaries
+        .then((pageHtml) => {
+          return storiesIndex.getStorySummaries(pageHtml)
+        })
+        .then(
           /**
-           * @type {Story}
+           * 
+           * @param {Generator<Story>} storySummariesGenerator
            */
-          let storySummary
-          for (
-            let i = 0; 
-            i < storiesRemaining() && (storySummary = storySummariesGenerator.next().value); 
-            i++
-          ) {
-            storySummaries.push(storySummary)
-          }
-          logger.info('fetched %s stories from page %s', storySummaries.length, pageNumber)
-          
-          // save story to memory and filesystem
-          pagedStories.set(pageNumber, storySummaries)
-          writeStoryPromises.push(
-            writeText(
-              JSON.stringify(storySummaries, undefined, 2),
-              path.join(storiesPath, 'index.json')
+          (storySummariesGenerator) => {
+            /**
+             * @type {Story}
+             */
+            let storySummary
+            while (storySummary = storySummariesGenerator.next().value) {
+              storySummaries.push(storySummary)
+            }
+            logger.info('fetched %s stories from page %s', storySummaries.length, pageNumber)
+            
+            // save stories page to filesystem
+            writeStoryPromises.push(
+              writeText(
+                JSON.stringify(storySummaries, undefined, 2),
+                storiesIndexPath
+              )
             )
-          )
+          }
+        )
+      }
 
-          storiesCount += storySummaries.length
-          pageNumber++
+      pagedStories.set(pageNumber, storySummaries)
 
-          // recursive call for next page
-          return fetchStory()
-        }
-      )
+      storiesCount += storySummaries.length
+      pageNumber++
+
+      // recursive call for next page
+      return fetchStory()
     }
     else {
       return Promise.all(writeStoryPromises)
@@ -615,6 +633,9 @@ export function listFiles(dir, pattern) {
           filePaths.push(filePath)
         }
       }
+
+      // os lists alphabetically, js Array.push inverts order; here we invert again
+      filePaths.reverse()
       return filePaths
     },
     (err) => {
