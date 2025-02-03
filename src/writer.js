@@ -3,7 +3,6 @@ import {
   access as fsAccess, 
   constants as fsConstants,
   mkdir,
-  appendFile,
   open
 } from 'fs/promises'
 import { createWriteStream } from 'fs'
@@ -95,24 +94,23 @@ export function initDir(path) {
  * @param {URL} url 
  * @param {string} localPath 
  * @param {boolean} skipIfFileExists
- * @returns {string} Path to downloaded file.
+ * @returns {Promise<string>} Path to downloaded file.
  */
 export function downloadWebpage(url, localPath, skipIfFileExists=true) {
   return new Promise(function(res, rej) {
-    fsAccess(localPath, fsConstants.F_OK)
+    fileExists(localPath)
     .then(
-      () => {
-        if (skipIfFileExists) {
-          logger.info('local-path=%s already exists for url=%s; skip download', localPath, url)
+      (exists) => {
+        if (exists) {
+          if (skipIfFileExists) {
+            logger.info('local-path=%s already exists for url=%s; skip download', localPath, url)
+          }
           return false
         }
         else {
+          logger.debug('local-path=%s does not yet exist for url=%s', localPath, url)
           return true
         }
-      },
-      () => {
-        logger.debug('local-path=%s does not yet exist for url=%s', localPath, url)
-        return true
       }
     )
     .then((doDownload) => {
@@ -131,4 +129,11 @@ export function downloadWebpage(url, localPath, skipIfFileExists=true) {
       }
     })
   })
+}
+
+export async function fileExists(path) {
+  return fsAccess(path, fsConstants.F_OK).then(
+    () => true,
+    () => false
+  )
 }
