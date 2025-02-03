@@ -303,6 +303,11 @@ export class MunjangStoriesIndex extends StoriesIndex {
 
   /**
    * Noticiero El País.
+   * 
+   * Currently fetches articles chronologically descending, which means content of a given page number will
+   * change over time. There is no convenient solution for this currently; try to fetch all article list pages
+   * at once, then process them later. If additional pages are needed, move or rename previous pages to pull in 
+   * new articles.
    */
   export class PaisStoriesIndex extends StoriesIndex {
     static selectorArticles = (
@@ -313,6 +318,8 @@ export class MunjangStoriesIndex extends StoriesIndex {
     static selectorArticleAuthor = '.c_a_a'
     static selectorArticleDatetime = '.c_a_t time'
     static selectorArticleDescription = '.c_d'
+
+    static selectorArticleText = 'body article .a_c[data-dtm-region="articulo_cuerpo"] p'
 
     /**
      * 
@@ -397,6 +404,28 @@ export class MunjangStoriesIndex extends StoriesIndex {
      * @returns {Generator<string>}
      */
     *getStoryText(storyPage) {
-        // TODO here
+        logger.debug('isolate story text at selector=%s', PaisStoriesIndex.selectorArticleText)
+
+        const pgraphsEl = storyPage.querySelectorAll(PaisStoriesIndex.selectorArticleText)
+        if (pgraphsEl.length < 1) {
+            throw new Error(`failed to load paragraphs from article page`, {
+                cause: {
+                    pgraphsElSelector: PaisStoriesIndex.selectorArticleText
+                }
+            })
+        }
+        logger.info('found %s paragraphs in article text', pgraphsEl.length)
+
+        /**
+         * @type {string}
+         */
+        let pgraph
+        for (let pgraphEl of pgraphsEl) {
+            pgraph = pgraphEl.textContent
+            .replaceAll(/\s+/g, ' ')
+            .trim()
+
+            yield pgraph
+        }
     }
   }
