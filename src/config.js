@@ -70,10 +70,17 @@ export const argParser = yargs()
   description: 'Local directory where story profiles are saved.',
   default: path.join('data', 'profiles')
 })
+.option('index', {
+  alias: 'i',
+  type: 'string',
+  description: 'Stories index/listing name.',
+  // choices are unknown until indexes are initialized
+  choices: undefined
+})
 .option('page', {
   alias: 'p',
   type: 'number',
-  description: 'Stories listing page number.',
+  description: 'Page number within stories index.',
   default: 1
 })
 .option('story', {
@@ -106,6 +113,7 @@ export const argParser = yargs()
  *  fetchStoriesMax: number,
  *  storiesDir: string,
  *  profilesDir: string,
+ *  index: string,
  *  page: number,
  *  story: string | undefined,
  *  storyLengthMax: number,

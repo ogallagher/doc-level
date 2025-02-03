@@ -172,7 +172,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
 
         super(
             url.toString(),
-            ['문장웹진', 'munjang-webzine'],
+            ['문장웹진', 'munjang-webzine', 'munjang'],
             1,
             70
         )

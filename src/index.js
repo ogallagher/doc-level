@@ -53,8 +53,11 @@ function init() {
           chatModel,
           maturityModel
         )
-
-        config.argParser.choices('fetch-stories-index', si.getStoryIndexNames())
+        
+        const indexNames = si.getStoryIndexNames()
+        config.argParser.choices('fetch-stories-index', indexNames)
+        config.argParser.choices('index', indexNames)
+        config.argParser.default('index', indexNames[0])
 
         return reader
         .init(logger, ai, chatModel, maturityModel, readingDifficultyWordsMax, readingDifficultyPhrasesMax)
@@ -93,16 +96,82 @@ function fetchStorySummaries(storiesIndex, storiesMax, storiesDir) {
 }
 
 /**
+ * @typedef {{
+ *  indexName: string,
+ *  pageNumber: number,
+ *  filePath: string
+ * }} IndexPage
+ */
+/**
+ * @param {string} storiesDir
+ * @returns {Promise<Map<string, Map<number, IndexPage>>>}
+ */
+async function fetchStoryIndexPages(storiesDir) {
+  /**
+   * @type {Map<string, Map<number,IndexPage>>}
+   */
+  const indexPages = new Map()
+
+  await (
+    reader.listFiles(storiesDir, /index.json$/)
+    .then((indexPaths) => {
+      logger.debug('parsing %s story index page paths', indexPages.length)
+      const pagePathRegExp = /\/([^\/]+)\/page-(\d+)/
+      
+      indexPaths.forEach(
+        /**
+         * @param {string} indexPagePath 
+         * @returns {IndexPage}
+         */
+        (indexPagePath) => {
+          const pagePathParse = indexPagePath.match(pagePathRegExp)
+          if (pagePathParse === null) {
+            logger.error('unable to parse stories index page path %s', indexPagePath)
+          }
+          else {
+            const indexPage = {
+              indexName: pagePathParse[1],
+              pageNumber: parseInt(pagePathParse[2]),
+              filePath: indexPagePath
+            }
+
+            if (indexPages.has(indexPage.indexName)) {
+              indexPages.get(indexPage.indexName).set(indexPage.pageNumber, indexPage)
+            }
+            else {
+              indexPages.set(indexPage.indexName, new Map([
+                [indexPage.pageNumber, indexPage]
+              ]))
+            }
+          }
+        }
+      )
+    })
+  )
+
+  return indexPages
+}
+
+/**
  * 
- * @param {string[]} storyIndexPaths 
+ * @param {Map<string, Map<number, IndexPage>>} indexPages 
  * @returns {Promise<void>}
  */
-async function showAvailableStories(storyIndexPaths) {
+async function showAvailableStories(indexPages) {
   const browseStoriesPrompt = await reader.loadPrompt(
     reader.PROMPT_BROWSE_STORIES_FILE,
-    storyIndexPaths.map((storyIndexPath, idx) => {
-      return `- [${idx + 1}] ${storyIndexPath}`
-    }).join('\n')
+    [...indexPages.entries()].map(([index, pages]) => {
+      // index section
+      return [`[${index}]`]
+      .concat(
+        [...pages.entries()].map(([page, sip]) => {
+          // page file
+          return `  [${page}] ${sip.filePath}`
+        })
+      )
+      .join('\n') + '\n'
+    })
+    .join('\n')
   )
   console.log(browseStoriesPrompt)
 }
@@ -311,16 +380,7 @@ async function main(argSrc) {
   ])
 
   // get available story index files
-  const storyIndexPaths = await reader.listFiles(args.storiesDir, /index.json$/)
-  logger.debug('loaded %s story index paths', storyIndexPaths.length)
-
-  /**
-   * @type {string|undefined}
-   */
-  const storyIndexPath = storyIndexPaths[args.page - 1]
-  let storyIndexName = (
-    storyIndexPath === undefined ? undefined : getStoryIndexName(args.storiesDir, storyIndexPath)
-  )
+  const indexPages = await fetchStoryIndexPages(args.storiesDir)
 
   /**
    * Story text as list of fragments.
@@ -334,13 +394,19 @@ async function main(argSrc) {
   
   if (args.story === undefined) {
     // show available local story lists if no story selected
-    await showAvailableStories(storyIndexPaths)
+    await showAvailableStories(indexPages)
   }
-  else {
-    // or fetch story
-    logger.info('fetch index=%s page=%s story=%s', storyIndexName, args.page, args.story)
+
+  if (args.story !== undefined) {
+    // resolve index alias
+    args.index = si.getStoriesIndex(args.index).name
+
+    // fetch story if selected
+    const indexPage = indexPages.get(args.index).get(args.page)
+
+    logger.info('fetch index=%s page-%s=[%s] story=%s', args.index, args.page, indexPage.filePath, args.story)
     await fetchStory(
-      args.storiesDir, storyIndexPath, storyIndexName, args.page, args.story
+      args.storiesDir, indexPage.filePath, args.index, args.page, args.story
     ).then((storyInfo) => {
       storyText = storyInfo.storyText
       storySummary = storyInfo.storySummary
@@ -355,7 +421,7 @@ async function main(argSrc) {
   let excerptPath
   if (storyText !== undefined) {
     excerptPath = path.join(
-      args.profilesDir, storyIndexName, `story-${args.story}`, 
+      args.profilesDir, args.index, `story-${args.story}`, 
       `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}_excerpt.txt`
     )
     await writer.initDir(path.dirname(excerptPath))
