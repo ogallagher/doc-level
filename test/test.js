@@ -156,19 +156,12 @@ describe('storiesIndex', function() {
      * @type {storiesIndex.MunjangStoriesIndex}
      */
     let mji
-    /**
-     * @type {Map}
-     */
-    let indexes
 
     this.beforeAll(function() {
       asi = new storiesIndex.StoriesIndex('https://host.tld', ['abstract0'])
       mji = new storiesIndex.MunjangStoriesIndex()
 
       return storiesIndex.init(logger)
-      .then((storiesIndexes) => {
-        indexes = storiesIndexes
-      })
     })
 
     describe('#getPageUrl', function() {
@@ -194,7 +187,7 @@ describe('storiesIndex', function() {
 
     describe('#storiesIndexes', function() {
       it('is updated with each instance', function() {
-        assert.ok(indexes.indexOf(asi.name) > 0)
+        assert.ok(storiesIndex.getStoriesIndex(asi.name) !== undefined)
       })
     })
 

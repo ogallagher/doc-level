@@ -32,6 +32,7 @@ export function init(parentLogger) {
 
     // create and register indexes
     new MunjangStoriesIndex()
+    new PaisStoriesIndex('opinion/columnas')
     
     logger.debug('end init')
     res()
@@ -297,5 +298,105 @@ export class MunjangStoriesIndex extends StoriesIndex {
                 })
             }
         }
+    }
+  }
+
+  /**
+   * Noticiero El País.
+   */
+  export class PaisStoriesIndex extends StoriesIndex {
+    static selectorArticles = (
+        'body > main article'
+    )
+    static selectorArticleTitle = 'header .c_t'
+    static selectorArticleUrl = `${PaisStoriesIndex.selectorArticleTitle} > a[href*="elpais.com"]`
+    static selectorArticleAuthor = '.c_a_a'
+    static selectorArticleDatetime = '.c_a_t time'
+    static selectorArticleDescription = '.c_d'
+
+    /**
+     * 
+     * @param {string} basePath 
+     */
+    constructor(basePath='opinion/columnas') {
+        let url = new URL('https://elpais.com/')
+        url.pathname = basePath
+
+        super(
+            url.toString(),
+            ['el-país', 'pais'],
+            0,
+            300
+        )
+    }
+
+    getPageUrl(pageNumber) {
+        this.assertPageNumberIsValid(pageNumber)
+        let url = new URL(this.urlTemplate)
+        url.pathname = path.join(url.pathname, pageNumber.toString())
+        return url
+    }
+
+    /**
+     * @param {HTMLElement} indexPage 
+     * @returns {Generator<Story>}
+     */
+    *getStorySummaries(indexPage) {
+        logger.debug('isolate list of articles at selector=%s', PaisStoriesIndex.selectorArticles)
+
+        const articlesEl = indexPage.querySelectorAll(PaisStoriesIndex.selectorArticles)
+        logger.info('found %s articles in index page', articlesEl.length)
+
+        const wsRegExp = /\s+/g
+
+        for (let [idx, articleEl] of articlesEl.entries()) {
+            try {
+                const title = articleEl.querySelector(
+                    PaisStoriesIndex.selectorArticleTitle
+                ).textContent.replaceAll(wsRegExp, ' ').trim()
+                logger.info('articles[%s] title=%s', idx, title)
+
+                const author = articleEl.querySelector(
+                    PaisStoriesIndex.selectorArticleAuthor
+                ).textContent.replaceAll(wsRegExp, ' ').trim()
+                const description = articleEl.querySelector(
+                    PaisStoriesIndex.selectorArticleDescription
+                ).textContent.replaceAll(wsRegExp, ' ').trim()
+                const url = new URL(
+                    articleEl.querySelector(PaisStoriesIndex.selectorArticleUrl).getAttribute('href')
+                )
+
+                /**
+                 * @type {Story}
+                 */
+                const summary = {
+                    authorName: author,
+                    title: title,
+                    publishDate: new Date(
+                        articleEl.querySelector(PaisStoriesIndex.selectorArticleDatetime).getAttribute('dateTime')
+                    ),
+                    viewCount: -1,
+                    url: url,
+                    excerpts: [description],
+                    id: path.basename(url.pathname, '.html')
+                }
+                logger.debug('articles[%s] summary object=%o', idx, summary)
+
+                yield summary
+            }
+            catch (err) {
+                throw new Error(`failed to parse summary of articles[${idx}]`, {
+                    cause: err
+                })
+            }
+        }
+    }
+
+    /**
+     * @param {HTMLElement} storyPage
+     * @returns {Generator<string>}
+     */
+    *getStoryText(storyPage) {
+        // TODO here
     }
   }
