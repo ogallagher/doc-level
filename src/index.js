@@ -22,7 +22,7 @@ import { regexpEscape, fileString } from './stringUtil.js'
 const logger = pino(
   {
     name: 'doc-level',
-    level: 'debug'
+    level: 'info'
   }
 )
 
@@ -84,6 +84,197 @@ function getArgSrc() {
   })
 }
 
+function fetchStorySummaries(storiesIndex, storiesMax, storiesDir) {
+  // fetch stories from requested index
+  return reader.fetchStories(storiesIndex, storiesMax, storiesDir)
+  .then((pagedStories) => {
+    logger.info('fetched %s pages of stories from %s', pagedStories.size, storiesIndex)
+  })
+}
+
+/**
+ * 
+ * @param {string[]} storyIndexPaths 
+ * @returns {Promise<void>}
+ */
+async function showAvailableStories(storyIndexPaths) {
+  const browseStoriesPrompt = await reader.loadPrompt(
+    reader.PROMPT_BROWSE_STORIES_FILE,
+    storyIndexPaths.map((storyIndexPath, idx) => {
+      return `- [${idx + 1}] ${storyIndexPath}`
+    }).join('\n')
+  )
+  console.log(browseStoriesPrompt)
+}
+
+/**
+ * 
+ * @param {string} storiesDir 
+ * @param {string} storyIndexPath
+ * @returns {string}
+ */
+function getStoryIndexName(storiesDir, storyIndexPath) {
+  // name of index to which this page belongs
+  const siNameMatch = storyIndexPath.match(
+    new RegExp(`^${regexpEscape(storiesDir)}/?(.+)/page`)
+  )
+  if (siNameMatch === null || siNameMatch.length < 1) {
+    throw new Error(`failed to parse stories index name from ${storyIndexPath}`, {
+      cause: siNameMatch
+    })
+  }
+
+  return siNameMatch[1]
+}
+
+/**
+ * Fetch story summary and full text as list of fragments.
+ * 
+ * @param {string} storiesDir
+ * @param {string[]} storyIndexPaths
+ * @param {number} storyIndexPage
+ * @param {string} storyIndexName
+ * @param {string} storyId
+ *  
+ * @returns {Promise<{storyText: string[], storySummary: ms.Story}>}
+ */
+async function fetchStory(storiesDir, storyIndexPath, storyIndexName, storyIndexPage, storyId) {
+  // load story summary from index page
+  const storySummary = await (
+    reader.loadText(storyIndexPath)
+    .then((indexJson) => {
+      /**
+       * @type {Story[]}
+       */
+      const stories = JSON.parse(indexJson).filter((story) => story.id === storyId)
+
+      if (stories.length === 1) {
+        return stories[0]
+      }
+      else {
+        throw new Error(`unable to load story id=${storyId} from ${storyIndexPath}`)
+      }
+    })
+  )
+
+  // download full story webpage to temp file
+  const tempDir = path.join(`data/temp/${storyIndexName}/page-${storyIndexPage}/story-${storyId}`)
+  await writer.initDir(tempDir)
+  const storyWebpagePath = await writer.downloadWebpage(
+    new URL(storySummary.url), 
+    path.join(tempDir, `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.html`),
+    true
+  )
+
+  // convert story webpage to full text
+  const storyPage = await reader.parseHtml(storyWebpagePath)
+  const storyFullTextPath = path.join(
+    storiesDir, storyIndexName, `story-${storyId}`, 
+    `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.txt`
+  )
+  await writer.initDir(path.dirname(storyFullTextPath))
+
+  let textGenerator = si.getStoriesIndex(storyIndexName).getStoryText(storyPage)
+  /**
+   * @type {string[]}
+   */
+  let storyText = []
+  /**
+   * @type {string}
+   */
+  let textFragment
+  let storyFile = await writer.openFile(storyFullTextPath)
+  while (textFragment = textGenerator.next().value) {
+    // create local reference so that next iteration can fetch while file is open
+    storyText.push(textFragment)
+    await writer.writeText(textFragment + '\n\n', storyFile)
+  }
+  storyFile.close()
+  
+  logger.info('saved story=%s paragraph-count=%s to %s', storyId, storyText.length, storyFullTextPath)
+  return { storyText, storySummary }
+}
+
+/**
+ * Reduce story text to excerpt string and save to local file.
+ * 
+ * Method does not wait for the excerpt file to be created before return, since it's only for
+ * user reference.
+ * 
+ * @param {string[]} storyText 
+ * @param {number} storyLengthMax 
+ * @param {string} excerptPath 
+ * @returns {Promise<string[]>} Story excerpt as list of fragments.
+ */
+async function reduceStory(storyText, storyLengthMax, excerptPath) {
+  const excerpt = await reader.reduceStory(storyText, storyLengthMax)
+  logger.info('reduced story len=%s to excerpt len=%s', storyText.length, excerpt.length)
+
+  // save reduced excerpt to local file
+  writer.writeText(excerpt.join('\n'), excerptPath)
+  .then(() => {
+    logger.info('saved story excerpt to path=%s', excerptPath)
+  })
+
+  return excerpt
+}
+
+/**
+ * Create story profile and save to local file.
+ * 
+ * @param {string} storyText 
+ * @param {string} textPath 
+ * @returns {Promise<reader.Context>}
+ */
+async function createProfile(storyText, textPath) {
+  const ctx = new reader.Context(storyText, new tp.TextProfile(), textPath)
+
+  await Promise.all([
+    new Promise(function(res) {
+      logger.info('get maturity of %s...', storyText.substring(0, 20))
+
+      reader.getMaturity(ctx)
+      .then((maturity) => {
+        ctx.profile.setMaturity(maturity)
+        logger.info('profile.maturity=%o', ctx.profile.maturity)
+        res()
+      })
+    }),
+    new Promise(function(res) {
+      logger.info('get difficulty of %s...', storyText.substring(0, 20))
+
+      reader.getDifficulty(ctx)
+      .then((difficulty) => {
+        ctx.profile.setDifficulty(difficulty)
+        logger.info('profile.difficulty=%o', ctx.profile.difficulty)
+        res()
+      })
+    }),
+    new Promise((res) => {
+      logger.info('get topics in %s...', storyText.substring(0, 20))
+
+      return reader.getTopics(ctx)
+      .then((topics) => {
+        ctx.profile.setTopics(topics)
+        logger.info('profile.topics=%o', ctx.profile.topics)
+        res()
+      })
+    })
+  ])
+
+  logger.info('created profile for given textPath=%o', ctx.textPath)
+
+  // save profile
+  logger.info('save profile to profilePath=%o', ctx.profilePath)
+  await writer.writeText(
+    JSON.stringify(ctx.profile, undefined, 2),
+    ctx.profilePath
+  )
+  logger.info('saved profile')
+
+  return ctx
+}
+
 /**
  * Looping program execution.
  * 
@@ -91,251 +282,101 @@ function getArgSrc() {
  * 
  * @returns {Promise<string>}
  */
-function main(argSrc) {
+async function main(argSrc) {
   // runtime args
-  return config.loadArgs(argSrc)
-  // update logging and filesystem
-  .then((args) => {
-    // TODO update of root logger level is not affecting child loggers
-    logger.level = args.logLevel
-    logger.debug('root logger.level=%s', logger.level)
+  const args = await config.loadArgs(argSrc)
 
-    return Promise.all([
-      writer.initDir(args.storiesDir),
-      writer.initDir(args.profilesDir)
-    ])
-    .then(() => args)
-  })
-  // fetch story summaries
-  .then((args) => {
-    /**
-     * @type {Promise<undefined>}
-     */
-    let pFetch
-    if (args.fetchStoriesIndex !== undefined) {
-      // fetch stories from requested index
-      const storiesIndex = si.getStoriesIndex(args.fetchStoriesIndex)
+  // update logging
+  // TODO update of root logger level is not affecting child loggers
+  logger.level = args.logLevel
+  logger.debug('root logger.level=%s', logger.level)
 
-      pFetch = reader.fetchStories(storiesIndex, args.fetchStoriesMax, args.storiesDir)
-      .then((pagedStories) => {
-        logger.info('fetched %s pages of stories from %s', pagedStories.size, storiesIndex)
-      })
-    }
-    else {
-      logger.debug('skip stories fetch')
-      pFetch = Promise.resolve()
-    }
-
-    return pFetch.then(() => args)
-  })
-  // get available story index files
-  .then((args) => {
-    return reader.listFiles(args.storiesDir, /index.json$/)
-    .then((storyIndexPaths) => {
-      logger.debug('loaded %s story index paths', storyIndexPaths.length)
-      return { args, storyIndexPaths }
-    })
-  })
-  // show available local story lists if no story selected,
-  // or fetch story
-  .then(({ args, storyIndexPaths }) => {
-    /**
-     * @type {string[]|undefined}
-     */
-    let storyText
-    /**
-     * @type {string|undefined}
-     */
-    let storyIndexName
-    /**
-     * @type {Story|undefined}
-     */
-    let storySummary
-
-    if (args.story === undefined) {
-      return reader.loadPrompt(
-        reader.PROMPT_BROWSE_STORIES_FILE, 
-        storyIndexPaths.map((storyIndexPath, idx) => {
-          return `- [${idx + 1}] ${storyIndexPath}`
-        }).join('\n')
-      )
-      .then((browseStoriesPrompt) => {
-        console.log(browseStoriesPrompt)
-        return { args, story: storyText, storyIndexName, storySummary }
-      })
-    }
-    else {
-      logger.info('page=%s story=%s', args.page, args.story)
-
-      const storyIndexPath = storyIndexPaths[args.page - 1]
-      // name of index to which this page belongs
-      const siNameMatch = storyIndexPath.match(
-        new RegExp(`^${regexpEscape(args.storiesDir)}/?(.+)/page`)
-      )
-      if (siNameMatch === null || siNameMatch.length < 1) {
-        throw new Error(`failed to parse stories index name from ${storyIndexPath}`, {
-          cause: siNameMatch
-        })
-      }
-      storyIndexName = siNameMatch[1]
-      logger.info('story=%s index=%s', args.story, storyIndexName)
-
-      // load requested story summary
-      return reader.loadText(storyIndexPath)
-      .then((indexJson) => {
-        /**
-         * @type {Story[]}
-         */
-        const stories = JSON.parse(indexJson).filter((story) => story.id === args.story)
-
-        if (stories.length === 1) {
-          storySummary = stories[0]
-        }
-        else {
-          logger.error('unable to load story id=%s from %s', args.story, storyIndexPath)
-          throw new Error(`unable to load story id=${args.story} from ${storyIndexPath}`)
-        }
-      })
-      // download full page to temp file
-      .then(() => {
-        const tempDir = path.join(`data/temp/${storyIndexName}/page-${args.page}/story-${args.story}`)
-        return writer.initDir(tempDir)
-        .then(() => {
-          return writer.downloadWebpage(
-            new URL(storySummary.url), 
-            path.join(tempDir, `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.html`),
-            true
-          )
-        })
-      })
-      // convert story webpage to full text
-      .then(reader.parseHtml)
-      .then((storyPage) => {
-        /**
-         * @type {si.StoriesIndex}
-         */
-        const storiesIndex = si.getStoriesIndex(storyIndexName)
-        let textGenerator = storiesIndex.getStoryText(storyPage)
-        /**
-         * @type {string}
-         */
-        let textFragment
-        const storyPath = path.join(
-          args.storiesDir, storyIndexName, `story-${args.story}`, 
-          `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.txt`
+  // update filesystem, fetch new story summaries
+  await Promise.all([
+    writer.initDir(args.storiesDir)
+    .then(async () => {
+      if (args.fetchStoriesIndex !== undefined) {
+        await fetchStorySummaries(
+          si.getStoriesIndex(args.fetchStoriesIndex),
+          args.fetchStoriesMax,
+          args.storiesDir
         )
-        return writer.initDir(path.dirname(storyPath))
-        .then(async () => {
-          storyText = []
-          let storyFile = await writer.openFile(storyPath)
-          while (textFragment = textGenerator.next().value) {
-            // create local reference so that next iteration can fetch while file is open
-            storyText.push(textFragment)
-            await writer.writeText(textFragment + '\n\n', storyFile)
-          }
-
-          storyFile.close()
-        })
-        .then(() => {
-          logger.info('saved story=%s paragraph-count=%s to %s', args.story, storyText.length, storyPath)
-          return { args, story: storyText, storyIndexName, storySummary }
-        })
-      })
-    }
-  })
-  // reduce story
-  .then(({ args, story, storyIndexName, storySummary }) => {
-    if (story !== undefined) {
-      return reader.reduceStory(story, args.storyLengthMax)
-      .then((excerpt) => {
-        logger.info('reduced story len=%s to excerpt len=%s', story.length, excerpt.length)
-        // save reduced excerpt to local file
-        const excerptFile = path.join(
-          args.profilesDir, storyIndexName, `story-${args.story}`, 
-          `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}_excerpt.txt`
-        )
-        return writer.initDir(path.dirname(excerptFile))
-        .then(() => {
-          return writer.writeText(excerpt.join('\n'), excerptFile)
-        })
-        .then(() => {
-          logger.info('saved story=%s excerpt to path=%s', args.story, excerptFile)
-          return {args, text: excerpt.join('\n'), textPath: excerptFile}
-        })
-      })
-    }
-    else {
-      logger.debug('story undefined; skip reduce')
-      return {args, text: undefined, textPath: undefined}
-    }
-  })
-  // create story profile
-  .then(({ args, text, textPath }) => {
-    if (text !== undefined) {
-      if (!args.skipProfile) {
-        let ctx = new reader.Context(text, new tp.TextProfile(), textPath)
-
-        return Promise.all([
-          new Promise(function(res) {
-            logger.info('get maturity of %s:%s...', args.story, text.substring(0, 20))
-
-            reader.getMaturity(ctx)
-            .then((maturity) => {
-              ctx.profile.setMaturity(maturity)
-              logger.info('profile.maturity=%o', ctx.profile.maturity)
-              res()
-            })
-          }),
-          new Promise(function(res) {
-            logger.info('get difficulty of %s...', text.substring(0, 20))
-
-            reader.getDifficulty(ctx)
-            .then((difficulty) => {
-              ctx.profile.setDifficulty(difficulty)
-              logger.info('profile.difficulty=%o', ctx.profile.difficulty)
-              res()
-            })
-          }),
-          new Promise((res) => {
-            logger.info('get topics in %s:%s...', args.story, text.substring(0, 20))
-
-            return reader.getTopics(ctx)
-            .then((topics) => {
-              ctx.profile.setTopics(topics)
-              logger.info('profile.topics=%o', ctx.profile.topics)
-              res()
-            })
-          })
-        ])
-        .then(() => {
-          return ctx
-        })
       }
       else {
-        logger.info('skip generate profile of story=%s path=%s', args.story, textPath)
+        logger.debug('skip story summaries fetch')
       }
-    }
-  })
-  // save profile
-  .then(
-    (ctx) => {
-      if (ctx !== undefined) {
-        logger.info('created profile for given textPath=%o', ctx.textPath)
-        logger.info('save profile to profilePath=%o', ctx.profilePath)
-        return writer.writeText(
-          JSON.stringify(ctx.profile, undefined, 2),
-          ctx.profilePath
-        )
-        .then(() => {
-          logger.info('saved profile')
-        })
-      }
-    }
+    }),
+
+    writer.initDir(args.profilesDir)
+  ])
+
+  // get available story index files
+  const storyIndexPaths = await reader.listFiles(args.storiesDir, /index.json$/)
+  logger.debug('loaded %s story index paths', storyIndexPaths.length)
+
+  /**
+   * @type {string|undefined}
+   */
+  const storyIndexPath = storyIndexPaths[args.page - 1]
+  let storyIndexName = (
+    storyIndexPath === undefined ? undefined : getStoryIndexName(args.storiesDir, storyIndexPath)
   )
-  // fetch next argSrc
-  .then(getArgSrc)
+
+  /**
+   * Story text as list of fragments.
+   * @type {string[]|undefined}
+   */
+  let storyText
+  /**
+   * @type {ms.Story}
+   */
+  let storySummary
+  
+  if (args.story === undefined) {
+    // show available local story lists if no story selected
+    await showAvailableStories(storyIndexPaths)
+  }
+  else {
+    // or fetch story
+    logger.info('fetch index=%s page=%s story=%s', storyIndexName, args.page, args.story)
+    await fetchStory(
+      args.storiesDir, storyIndexPath, storyIndexName, args.page, args.story
+    ).then((storyInfo) => {
+      storyText = storyInfo.storyText
+      storySummary = storyInfo.storySummary
+    })
+    logger.debug('fetched storySummary=%o', storySummary)
+  }
+
+  // reduce story
+  /**
+   * @type {string|undefined}
+   */
+  let excerptPath
+  if (storyText !== undefined) {
+    excerptPath = path.join(
+      args.profilesDir, storyIndexName, `story-${args.story}`, 
+      `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}_excerpt.txt`
+    )
+    await writer.initDir(path.dirname(excerptPath))
+    storyText = await reduceStory(storyText, args.storyLengthMax, excerptPath)
+  }
+  else {
+    logger.debug('story undefined; skip reduce')
+  }
+  
+  // create story profile
+  if (storyText !== undefined) {
+    if (!args.skipProfile) {
+      await createProfile(storyText.join('\n'), excerptPath)
+    }
+    else {
+      logger.info('skip generate profile of story=%s path=%s', args.story, excerptPath)
+    }
+  }
+
   // loop main
-  .then(main)
+  getArgSrc().then(main)
 }
 
 // init
