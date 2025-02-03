@@ -138,6 +138,10 @@ export class StoriesIndex {
 }
 
 export class MunjangStoriesIndex extends StoriesIndex {
+    static SORT_DATE_ASC = 'OLD'
+    static SORT_DATE_DESC = 'RECENT'
+    static SEARCH_KEY_PAGE = 'nPage'
+
     static selectorStories = (
         '#contents .board.container > .board_list .list_ul .list_li'
     )
@@ -153,12 +157,21 @@ export class MunjangStoriesIndex extends StoriesIndex {
     )
     static selectorTextParagraphs = [
         'p.p1',
-        'blockquote'
+        'blockquote',
+        'p > span'
     ].join(',')
 
     constructor() {
+        let url = new URL('https://munjang.or.kr/board.es')
+        url.searchParams.set('act', 'list')
+        url.searchParams.set('bid', '0003')
+        // category=소설
+        url.searchParams.set('mid', 'a20103000000')
+        // sort ascending to prevent different results for same page number
+        url.searchParams.set('ord', MunjangStoriesIndex.SORT_DATE_ASC)
+
         super(
-            'https://munjang.or.kr/board.es?mid=a20103000000&bid=0003&act=list&ord=RECENT&nPage=1',
+            url.toString(),
             ['문장웹진', 'munjang-webzine'],
             1,
             70
@@ -168,7 +181,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
     getPageUrl(pageNumber) {
         this.assertPageNumberIsValid(pageNumber)
         let url = new URL(this.urlTemplate)
-        url.searchParams.set('nPage', pageNumber)
+        url.searchParams.set(MunjangStoriesIndex.SEARCH_KEY_PAGE, pageNumber)
         return url
     }
 
@@ -188,7 +201,8 @@ export class MunjangStoriesIndex extends StoriesIndex {
                 logger.info('stories[%s] title-author=%s', idx, titleAuthor)
 
                 const splitIdx = titleAuthor.indexOf('-')
-                const author = titleAuthor.substring(0, splitIdx)
+                let author = titleAuthor.substring(0, splitIdx)
+
                 const title = titleAuthor.substring(splitIdx + 1)
                 logger.debug('stories[%s] title.raw=%s author.raw=%s', idx, title, author)
 
@@ -200,6 +214,11 @@ export class MunjangStoriesIndex extends StoriesIndex {
                 .replace(/광고 건너뛰기▶｜\s+/, '')
                 .replaceAll(/[\r\n]+\s+/g, ' ')
                 .trim()
+
+                if (splitIdx === -1) {
+                    logger.debug('title=%s does not contain author; get from start of excerpt')
+                    author = excerpt.substring(0, excerpt.search(/\s/))
+                }
 
                 const url = new URL(path.join(
                     this.urlTemplate.origin,
@@ -244,7 +263,12 @@ export class MunjangStoriesIndex extends StoriesIndex {
         const pgraphsEl = textEl?.querySelectorAll(MunjangStoriesIndex.selectorTextParagraphs)
         if (pgraphsEl === undefined || pgraphsEl.length < 1) {
             throw new Error(`failed to load paragraphs from story page`, {
-                cause: [textEl, pgraphsEl]
+                cause: {
+                    textElIsDefined: textEl !== undefined,
+                    textElSelector: MunjangStoriesIndex.selectorStoryText,
+                    pgraphsElCount: pgraphsEl.length,
+                    pgraphsElSelector: MunjangStoriesIndex.selectorTextParagraphs
+                }
             })
         }
         logger.info('found %s paragraphs in story text', pgraphsEl.length)
