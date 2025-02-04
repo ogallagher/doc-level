@@ -264,15 +264,20 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
         // download index webpage
         await downloadWebpage(
           storiesIndex.getPageUrl(pageNumber).toString(),
-          path.join(storiesDir, 'index.html')
+          path.join(storiesDir, storiesIndex.pageFilename)
         )
         // load webpage
         .then((indexPagePath) => {
-          return parseHtml(indexPagePath)
+          if (path.extname(storiesIndex.pageFilename) === '.json') {
+            return loadText(indexPagePath).then(JSON.parse)
+          }
+          else {
+            return parseHtml(indexPagePath)
+          }
         })
         // extract story summaries
-        .then((pageHtml) => {
-          return storiesIndex.getStorySummaries(pageHtml)
+        .then((indexPage) => {
+          return storiesIndex.getStorySummaries(indexPage)
         })
         .then(
           /**

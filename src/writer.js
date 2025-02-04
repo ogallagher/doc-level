@@ -6,7 +6,8 @@ import {
   open
 } from 'fs/promises'
 import { createWriteStream } from 'fs'
-import request from 'request'
+import axios from 'axios'
+import { v4 as uuidv4 } from 'uuid'
 /**
  * @typedef {import('pino').Logger} Logger
  * 
@@ -115,13 +116,41 @@ export function downloadWebpage(url, localPath, skipIfFileExists=true) {
     )
     .then((doDownload) => {
       if (doDownload) {
-        request.get(url.toString())
-        .pipe(
-          createWriteStream(localPath)
-          .on('error', rej)
-          .on('close', () => {
-            res(localPath)
-          })
+        return axios.get(url, {
+          // mimic headers used in a browser for more restricted endpoints
+          headers: {
+            'accept': '*/*',
+            'accept-encoding': 'gzip,deflate,br',
+            'cache-control': 'max-age=0',
+            'connection': 'keep-alive',
+            'host': url.hostname,
+            'postman-token': uuidv4(),
+            'set-ch-ua-platform': 'Unknown',
+            'sec-fetch-mode': 'navigate',
+            // chrome-windows
+            'user-agent': [
+              'Mozilla/5.0',
+              '(Windows NT 10.0; WOW64)',
+              'AppleWebKit/537.36',
+              '(KHTML, like Gecko)',
+              'Chrome/132.0.0.0',
+              'Safari/537.36'
+            ].join(' '),
+          },
+          responseType: 'stream'
+        })
+        .then(
+          (response) => {
+            logger.debug('http get %s statusText=%s', url, response.statusText)
+            response.data.pipe(
+              createWriteStream(localPath)
+              .on('error', rej)
+              .on('close', () => {
+                res(localPath)
+              })
+            )
+          },
+          rej
         )
       }
       else {
