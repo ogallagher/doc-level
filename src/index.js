@@ -177,26 +177,6 @@ async function showAvailableStories(indexPages) {
 }
 
 /**
- * 
- * @param {string} storiesDir 
- * @param {string} storyIndexPath
- * @returns {string}
- */
-function getStoryIndexName(storiesDir, storyIndexPath) {
-  // name of index to which this page belongs
-  const siNameMatch = storyIndexPath.match(
-    new RegExp(`^${regexpEscape(storiesDir)}/?(.+)/page`)
-  )
-  if (siNameMatch === null || siNameMatch.length < 1) {
-    throw new Error(`failed to parse stories index name from ${storyIndexPath}`, {
-      cause: siNameMatch
-    })
-  }
-
-  return siNameMatch[1]
-}
-
-/**
  * Fetch story summary and full text as list of fragments.
  * 
  * @param {string} storiesDir

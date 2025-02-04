@@ -433,8 +433,8 @@ export class PaisStoriesIndex extends StoriesIndex {
     let pgraph
     for (let pgraphEl of pgraphsEl) {
       pgraph = pgraphEl.textContent
-        .replaceAll(/\s+/g, ' ')
-        .trim()
+      .replaceAll(/\s+/g, ' ')
+      .trim()
 
       yield pgraph
     }
@@ -449,6 +449,8 @@ export class PaisStoriesIndex extends StoriesIndex {
  * fetch story data, in JSON format.
  */
 export class WashingtonPostStoriesIndex extends StoriesIndex {
+  static selectorArticleText = 'body main article .article-body p[data-el="text"]'
+
   /**
    * @param {string} basePath
    */
@@ -558,7 +560,29 @@ export class WashingtonPostStoriesIndex extends StoriesIndex {
    * @param {HTMLElement} storyPage
    * @returns {Generator<string>}
    */
-  // TODO *getStoryText(storyPage) {
+  *getStoryText(storyPage) {
+    logger.debug('isolate story text at selector=%s', WashingtonPostStoriesIndex.selectorArticleText)
 
-  // }
+    const pgraphsEl = storyPage.querySelectorAll(WashingtonPostStoriesIndex.selectorArticleText)
+    if (pgraphsEl.length < 1) {
+      throw new Error(`failed to load paragraphs from article page`, {
+        cause: {
+          pgraphsElSelector: WashingtonPostStoriesIndex.selectorArticleText
+        }
+      })
+    }
+    logger.info('found %s paragraphs in article text', pgraphsEl.length)
+
+    /**
+     * @type {string}
+     */
+    let pgraph
+    for (let pgraphEl of pgraphsEl) {
+      pgraph = pgraphEl.textContent
+      .replaceAll(/\s+/g, ' ')
+      .trim()
+      
+      yield pgraph
+    }
+  }
 }
