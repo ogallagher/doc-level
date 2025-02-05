@@ -264,12 +264,20 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
         // download index webpage
         await downloadWebpage(
           storiesIndex.getPageUrl(pageNumber).toString(),
-          path.join(storiesDir, storiesIndex.pageFilename)
+          path.join(storiesDir, storiesIndex.pageFilename),
+          true,
+          storiesIndex.pageRequestHeaders
         )
         // load webpage
         .then((indexPagePath) => {
           if (path.extname(storiesIndex.pageFilename) === '.json') {
-            return loadText(indexPagePath).then(JSON.parse)
+            return loadText(indexPagePath)
+            // Sometimes (Naver Blog) the result has some dirty characters at the beginning to be removed.
+            .then((jsonStr) => {
+              // from start of first object or array
+              return jsonStr.substring(jsonStr.search(/[\{\[]/))
+            })
+            .then(JSON.parse)
           }
           else {
             return parseHtml(indexPagePath)

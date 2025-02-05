@@ -34,6 +34,7 @@ export function init(parentLogger) {
     new MunjangStoriesIndex()
     new PaisStoriesIndex('opinion/columnas')
     new WashingtonPostStoriesIndex('/opinions/columns')
+    new NaverBlogStoriesIndex()
 
     logger.debug('end init')
     res()
@@ -59,9 +60,14 @@ export class StoriesIndex {
    * @param {string[]} name 
    * @param {number} pageNumberMin 
    * @param {number} pageNumberMax 
-   * @param {string} pageFilename
+   * @param {string} pageFilename,
+   * @param {any} pageRequestHeaders
    */
-  constructor(urlTemplate, names, pageNumberMin = 0, pageNumberMax = 50, pageFilename = 'index.html') {
+  constructor(
+    urlTemplate, names, 
+    pageNumberMin = 0, pageNumberMax = 50, pageFilename = 'index.html',
+    pageRequestHeaders = undefined
+  ) {
     /**
      * @type {URL}
      */
@@ -83,6 +89,10 @@ export class StoriesIndex {
      * @type {string}
      */
     this.pageFilename = pageFilename
+    /**
+     * HTTP request headers when fetching an index/listing page.
+     */
+    this.pageRequestHeaders = pageRequestHeaders
 
     names.map((alias) => {
       storiesIndexes.set(alias, this)
@@ -184,7 +194,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
 
     super(
       url.toString(),
-      ['문장웹진', 'munjang-webzine', 'munjang'],
+      ['문장웹진', 'mj'],
       1,
       70
     )
@@ -585,4 +595,91 @@ export class WashingtonPostStoriesIndex extends StoriesIndex {
       yield pgraph
     }
   }
+}
+
+/**
+ * 네이버 블로그.
+ * 
+ * Lists most popular and recent descending. The static page does not have any articles, so we have to call the
+ * underlying api endpoints to fetch article info. The contained articles vary widely between calls, even for the
+ * same page, with the same session cookie, within a few seconds of the previous call. 
+ * Regardless of this additional variability, the content of a given page will change as new posts are available.
+ */
+export class NaverBlogStoriesIndex extends StoriesIndex {
+  static SEARCH_KEY_CATEGORY = 'directoryNo'
+  static SEARCH_KEY_PAGE = 'currentPage'
+
+  constructor() {
+    let url = new URL('https://section.blog.naver.com/ajax/DirectoryPostList.naver?directorySeq=0')
+    url.searchParams.set(NaverBlogStoriesIndex.SEARCH_KEY_CATEGORY, 0)
+
+    super(
+      url.toString(),
+      ['네이버-블로그', 'navblog'],
+      1,
+      300,
+      'index-naver-api.json',
+      {
+        'referer': 'https://section.blog.naver.com/ThemePost.naver'
+      }
+    )
+  }
+
+  getPageUrl(pageNumber) {
+    this.assertPageNumberIsValid(pageNumber)
+    let url = new URL(this.urlTemplate)
+
+    url.searchParams.set(NaverBlogStoriesIndex.SEARCH_KEY_PAGE, pageNumber)
+    return url
+  }
+
+  /**
+   * @param {{result: {
+   *  totalCount: number,
+   *  postList: {
+   *    domainIdOrBlogId: string,
+   *    nickname: string,
+   *    logNo: number,
+   *    title: string,
+   *    postUrl: string,
+   *    briefContents: string,
+   *    sympathyCnt: number,
+   *    addDate: number,
+   *    sympathyEnable: boolean
+   *  }[]
+   * }}} indexPage
+   * @returns {Generator<Story>}
+   */
+  *getStorySummaries(indexPage) {
+    logger.debug('found %s posts in index page', indexPage.result.postList.length)
+
+    for (let [idx, post] of indexPage.result.postList.entries()) {
+      try {
+        /**
+         * @type {Story}
+         */
+        const summary = {
+          authorName: post.nickname,
+          title: post.title,
+          // convert epoch ts to date
+          publishDate: new Date(post.addDate),
+          // use reaction count instead of unavailable views
+          viewCount: (post.sympathyEnable ? post.sympathyCnt : -1),
+          url: post.postUrl,
+          excerpts: [
+            post.briefContents
+          ],
+          id: `${post.domainIdOrBlogId}_${post.logNo}`
+        }
+        logger.debug('posts[%s] summary object=%o', idx, summary)
+
+        yield summary
+      }
+      catch (err) {
+        throw new Error(`failed to parse summary of posts[${idx}]`, {cause: err})
+      }
+    }
+  }
+
+  // TODO getStoryText
 }

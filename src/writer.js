@@ -95,10 +95,11 @@ export function initDir(path) {
  * @param {URL} url 
  * @param {string} localPath 
  * @param {boolean} skipIfFileExists
+ * @param {any} reqHeaders Value for "Referer" request header.
  * @returns {Promise<string>} Path to downloaded file.
  */
-export function downloadWebpage(url, localPath, skipIfFileExists=true) {
-  return new Promise(function(res, rej) {
+export function downloadWebpage(url, localPath, skipIfFileExists=true, reqHeaders=undefined) {
+  return new Promise((res, rej) => {
     fileExists(localPath)
     .then(
       (exists) => {
@@ -116,27 +117,35 @@ export function downloadWebpage(url, localPath, skipIfFileExists=true) {
     )
     .then((doDownload) => {
       if (doDownload) {
+        // mimic headers used in a browser for more restricted endpoints
+        let headers = {
+          'accept': '*/*',
+          'accept-encoding': 'gzip,deflate,br',
+          'cache-control': 'max-age=0',
+          'connection': 'keep-alive',
+          'host': url.hostname,
+          'postman-token': uuidv4(),
+          'set-ch-ua-platform': 'Unknown',
+          'sec-fetch-mode': 'navigate',
+          // chrome-windows
+          'user-agent': [
+            'Mozilla/5.0',
+            '(Windows NT 10.0; WOW64)',
+            'AppleWebKit/537.36',
+            '(KHTML, like Gecko)',
+            'Chrome/132.0.0.0',
+            'Safari/537.36'
+          ].join(' '),
+        }
+        // additional headers
+        if (reqHeaders !== undefined) {
+          for (let [key, val] of Object.entries(reqHeaders)) {
+            headers[key] = val
+          }
+        }
+
         return axios.get(url, {
-          // mimic headers used in a browser for more restricted endpoints
-          headers: {
-            'accept': '*/*',
-            'accept-encoding': 'gzip,deflate,br',
-            'cache-control': 'max-age=0',
-            'connection': 'keep-alive',
-            'host': url.hostname,
-            'postman-token': uuidv4(),
-            'set-ch-ua-platform': 'Unknown',
-            'sec-fetch-mode': 'navigate',
-            // chrome-windows
-            'user-agent': [
-              'Mozilla/5.0',
-              '(Windows NT 10.0; WOW64)',
-              'AppleWebKit/537.36',
-              '(KHTML, like Gecko)',
-              'Chrome/132.0.0.0',
-              'Safari/537.36'
-            ].join(' '),
-          },
+          headers,
           responseType: 'stream'
         })
         .then(
