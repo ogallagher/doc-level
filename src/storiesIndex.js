@@ -655,6 +655,17 @@ export class NaverBlogStoriesIndex extends StoriesIndex {
 
     for (let [idx, post] of indexPage.result.postList.entries()) {
       try {
+        // convert container to child/iframe url
+        let containerUrl = new URL(post.postUrl)
+        let childUrl = new URL(containerUrl.origin)
+        childUrl.pathname = '/PostView.naver'
+        childUrl.searchParams.set('redirect', 'Dlog')
+        childUrl.searchParams.set('widgetTypeCall', true)
+        childUrl.searchParams.set('noTrackingCode', true)
+        childUrl.searchParams.set('directAccess', false)
+        childUrl.searchParams.set('blogId', post.domainIdOrBlogId)
+        childUrl.searchParams.set('logNo', post.logNo)
+
         /**
          * @type {Story}
          */
@@ -665,7 +676,7 @@ export class NaverBlogStoriesIndex extends StoriesIndex {
           publishDate: new Date(post.addDate),
           // use reaction count instead of unavailable views
           viewCount: (post.sympathyEnable ? post.sympathyCnt : -1),
-          url: post.postUrl,
+          url: childUrl.toString(),
           excerpts: [
             post.briefContents
           ],
