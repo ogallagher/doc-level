@@ -609,6 +609,10 @@ export class NaverBlogStoriesIndex extends StoriesIndex {
   static SEARCH_KEY_CATEGORY = 'directoryNo'
   static SEARCH_KEY_PAGE = 'currentPage'
 
+  static selectorPostText = 'body #body #whole-body #post-area #postListBody .post-body'
+  static selectorTextTitle = '.se-documentTitle .se-text-paragraph'
+  static selectorTextBody = '.se-main-container .se-text .se-text-paragraph'
+
   constructor() {
     let url = new URL('https://section.blog.naver.com/ajax/DirectoryPostList.naver?directorySeq=0')
     url.searchParams.set(NaverBlogStoriesIndex.SEARCH_KEY_CATEGORY, 0)
@@ -692,5 +696,39 @@ export class NaverBlogStoriesIndex extends StoriesIndex {
     }
   }
 
-  // TODO getStoryText
+  /**
+   * @param {HTMLElement} storyPage
+   * @returns {Generator<string>}
+   */
+  *getStoryText(storyPage) {
+    logger.debug('isolate post text at selector=%s', NaverBlogStoriesIndex.selectorPostText)
+
+    const postEl = storyPage.querySelector(NaverBlogStoriesIndex.selectorPostText)
+    const pgraphsEl = postEl?.querySelectorAll(NaverBlogStoriesIndex.selectorTextBody)
+    if (pgraphsEl === undefined || pgraphsEl.length < 1) {
+      throw new Error(`failed to load paragraphs from post page`, {
+        cause: {
+          postElSelector: NaverBlogStoriesIndex.selectorPostText,
+          pgraphsElSelector: NaverBlogStoriesIndex.selectorTextBody,
+          postElIsDefined: postEl !== null,
+          pgraphsElIsDefined: false
+        }
+      })
+    }
+    logger.info('found %s paragraphs in post text', pgraphsEl.length)
+
+    /**
+     * @type {string}
+     */
+    let pgraph
+    for (let pgraphEl of pgraphsEl) {
+      pgraph = pgraphEl.textContent
+      .replaceAll(/\s+/g, ' ')
+      .trim()
+
+      if (pgraph.length > 1) {
+        yield pgraph
+      }
+    }
+  }
 }
