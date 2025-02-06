@@ -35,6 +35,7 @@ export function init(parentLogger) {
     new PaisStoriesIndex('opinion/columnas')
     new WashingtonPostStoriesIndex('/opinions/columns')
     new NaverBlogStoriesIndex()
+    new NuevoDiaStoriesIndex('/opinion/columnas')
 
     logger.debug('end init')
     res()
@@ -731,4 +732,69 @@ export class NaverBlogStoriesIndex extends StoriesIndex {
       }
     }
   }
+}
+
+/**
+ * Noticiero El Nuevo Día. Lists recent descending as a single endless page. Call the underlying articles
+ * api endpoint to fetch each page.
+ */
+export class NuevoDiaStoriesIndex extends StoriesIndex {
+  static SEARCH_KEY_QUERY = 'query'
+  
+  static ARTICLE_MAX = 1000
+
+  constructor(basePath, pageArticleCount=20) {
+    let refererUrl = new URL('https://www.elnuevodia.com')
+    refererUrl.pathname = basePath
+
+    super(
+      'https://www.elnuevodia.com/pf/api/v3/content/fetch/latest-articles-opinion-by-subsection-v1',
+      ['nuevo-dia', 'ndia'],
+      0, 
+      NuevoDiaStoriesIndex.ARTICLE_MAX / pageArticleCount,
+      'index-ndia-pf-api.json',
+      {
+        'referer': refererUrl.toString()
+      }
+    )
+
+    /**
+     * Articles per page/api call.
+     * 
+     * @type {number}
+     */
+    this.pageArticleCount = pageArticleCount
+
+    /**
+     * @type {{
+     *  url: string,
+     *  website: string,
+     *  size: number,
+     *  from: number,
+     *  arc-site: string
+     * }}
+     */
+    this.pfApiQuery = {
+      uri: basePath,
+      website: 'el-nuevo-dia',
+      size: pageArticleCount,
+      from: 0,
+      'arc-site': 'el-nuevo-dia'
+    }
+  }
+
+  getPageUrl(pageNumber) {
+    this.assertPageNumberIsValid(pageNumber)
+    let url = new URL(this.urlTemplate)
+
+    this.pfApiQuery.from = pageNumber * this.pageArticleCount
+    url.searchParams.set(
+      NuevoDiaStoriesIndex.SEARCH_KEY_QUERY, JSON.stringify(this.pfApiQuery)
+    )
+    return url
+  }
+
+  // TODO getStorySummaries
+
+  // TODO getStoryText
 }
