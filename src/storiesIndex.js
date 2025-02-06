@@ -794,7 +794,57 @@ export class NuevoDiaStoriesIndex extends StoriesIndex {
     return url
   }
 
-  // TODO getStorySummaries
+  /**
+   * @param {{groups: {
+   *  author: {
+   *    id: string,
+   *    byline: string,
+   *    biography: string,
+   *    link: string
+   *  },
+   *  articles: {
+   *    id: string,
+   *    headline: string,
+   *    subheadline: string,
+   *    displayDate: string,
+   *    canonicalUrl: string
+   *  }[]
+   * }[]}} indexPage
+   * @returns {Generator<Story>}
+   */
+  *getStorySummaries(indexPage) {
+    logger.debug('found %s article groups in index page', indexPage.groups.length)
+
+    for (let [g_idx, group] of indexPage.groups.entries()) {
+      for (let [a_idx, article] of group.articles.entries()) {
+        let url = new URL(this.urlTemplate)
+        url.pathname = article.canonicalUrl
+
+        try {
+          /**
+           * @type {Story}
+           */
+          const summary = {
+            authorName: group.author.byline,
+            title: article.headline,
+            publishDate: new Date(article.displayDate),
+            viewCount: -1,
+            url: url.toString(),
+            excerpts: [
+              article.subheadline
+            ],
+            id: `${group.author.id}_${article.id}`
+          }
+          logger.debug('groups[%s].articles[%s] summary object=%0', g_idx, a_idx, summary)
+
+          yield summary
+        }
+        catch (err) {
+          throw new Error(`failed to parse summary of groups[${g_idx}].articles[${a_idx}]`, {cause: err})
+        }
+      }
+    }
+  }
 
   // TODO getStoryText
 }
