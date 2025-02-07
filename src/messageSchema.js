@@ -90,6 +90,24 @@ Topics.name = 'Topics'
  * }} TopicsResponse
  */
 
+export let Ideologies = z.object({
+  ideologies: z.array(z.object({
+    id: z.string(),
+    presence: z.number(),
+    examples: z.array(z.string())
+  }))
+})
+Ideologies.name = 'Ideologies'
+/**
+ * @typedef {{
+ *  ideologies: {
+ *    id: string,
+ *    presence: number,
+ *    examples: string[]
+ *  }[]
+ * }} IdeologiesResponse
+ */
+
 export let Stories = z.object({
   stories: z.array(z.object({
     authorName: z.string(),

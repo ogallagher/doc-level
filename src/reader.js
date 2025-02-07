@@ -6,15 +6,17 @@ import { zodResponseFormat } from 'openai/helpers/zod'
 import path from 'path'
 import { readFile, readdir } from 'node:fs/promises'
 import * as HtmlParser from 'node-html-parser'
-import { Maturity, TextProfile, Difficulty, Topic, MATURITY_TYPE_PROFANE } from './textProfile.js'
-import { CustomMaturityTypes, ReadingDifficulty, Topics } from './messageSchema.js'
+import { Maturity, TextProfile, Difficulty, Topic, MATURITY_TYPE_PROFANE, Ideology } from './textProfile.js'
+import { CustomMaturityTypes, Ideologies, ReadingDifficulty, Topics } from './messageSchema.js'
 import { formatString } from './stringUtil.js'
 import {
   READING_DIFFICULTY_REASONS_MAX as _difficultReasonsMax,
   READING_DIFFICULTY_WORDS_MIN as _difficultWordsMin,
   READING_DIFFICULTY_PHRASES_MIN as _difficultPhrasesMin,
   TOPICS_MAX as _topicsMax,
-  TOPIC_EXAMPLES_MAX as _topicExamplesMax
+  TOPIC_EXAMPLES_MAX as _topicExamplesMax,
+  IDEOLOGIES_MAX as _ideologiesMax,
+  IDEOLOGY_EXAMPLES_MAX as _ideologyExamplesMax
 } from './config.js'
 import { StoriesIndex } from './storiesIndex.js'
 import { downloadWebpage, fileExists, initDir, writeText } from './writer.js'
@@ -31,6 +33,7 @@ import { downloadWebpage, fileExists, initDir, writeText } from './writer.js'
  * @typedef {import('./messageSchema.js').ExtractStoriesResponse} ExtractStoriesResponse
  * @typedef {import('./messageSchema.js').TopicsResponse} TopicsResponse
  * @typedef {import('./messageSchema.js').Story} Story
+ * @typedef {import('./messageSchema.js').IdeologiesResponse} IdeologiesResponse
  */
 
 let PROMPT_DIR = path.join(import.meta.dirname, 'resource/prompt')
@@ -38,6 +41,7 @@ let PROMPT_DIR = path.join(import.meta.dirname, 'resource/prompt')
 export const PROMPT_CUSTOM_MATURITY_FILE = 'customMaturity.txt'
 export const PROMPT_READING_DIFFICULTY_FILE = 'readingDifficulty.txt'
 export const PROMPT_TOPICS_FILE = 'topics.txt'
+export const PROMPT_IDEOLOGIES_FILE = 'ideologyPolitics.txt'
 // prompts for human user
 export const PROMPT_BROWSE_STORIES_FILE = 'browseStories.txt'
 
@@ -538,8 +542,42 @@ export function getVocabularyNovelty(ctx) {
   
 }
 
-export function getPoliticalBias(ctx) {
-  
+/**
+ * 
+ * @param {Context} ctx 
+ * @returns {Promise<Ideology>}
+ */
+export function getIdeologies(ctx) {
+  return loadPrompt(
+    PROMPT_IDEOLOGIES_FILE,
+    _ideologiesMax,
+    _ideologyExamplesMax
+  )
+  .then(
+    /**
+     * 
+     * @param {string} ideologiesPrompt 
+     * @returns {Promise<IdeologiesResponse>}
+     */
+    (ideologiesPrompt) => {
+      return getChatResponse(
+        ideologiesPrompt,
+        ctx.text,
+        Ideologies
+      )
+    }
+  )
+  .then(
+    (ideologiesResponse) => {
+      return ideologiesResponse.ideologies.map((ideologyData) => {
+        return new Ideology(
+          ideologyData.id, 
+          ideologyData.presence, 
+          ideologyData.examples
+        )
+      })
+    }
+  )
 }
 
 /**

@@ -31,6 +31,8 @@ export const READING_DIFFICULTY_PHRASES_MIN = 3
 export const READING_DIFFICULTY_PHRASES_MAX = 10
 export const TOPICS_MAX = 6
 export const TOPIC_EXAMPLES_MAX = 10
+export const IDEOLOGIES_MAX = 6
+export const IDEOLOGY_EXAMPLES_MAX = 10
 
 /**
  * @type {Logger}

@@ -89,6 +89,25 @@ export class Topic {
   }
 }
 
+export class Ideology {
+  constructor(id, presence, examplePhrases=[]) {
+    /**
+     * @type {string}
+     */
+    this.id = id
+
+    /**
+     * @type {number}
+     */
+    this.presence = presence
+
+    /**
+     * @type {string[]}
+     */
+    this.examplePhrases = examplePhrases
+  }
+}
+
 export class TextProfile {
   constructor() {
     /**
@@ -100,6 +119,10 @@ export class TextProfile {
      * @type {Topic[]}
      */
     this.topics = []
+    /**
+     * @type {Ideology[]}
+     */
+    this.ideologies = []
   }
   
   setMaturity(maturity) {
@@ -112,5 +135,9 @@ export class TextProfile {
 
   setTopics(topics) {
     this.topics = topics
+  }
+
+  setIdeologies(ideologies) {
+    this.ideologies = ideologies
   }
 }

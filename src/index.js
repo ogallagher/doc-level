@@ -287,9 +287,11 @@ async function reduceStory(storyText, storyLengthMax, excerptPath) {
 async function createProfile(storyText, textPath) {
   const ctx = new reader.Context(storyText, new tp.TextProfile(), textPath)
 
+  let storyPrelude = storyText.substring(0, 20)
+
   await Promise.all([
-    new Promise(function(res) {
-      logger.info('get maturity of %s...', storyText.substring(0, 20))
+    new Promise((res) => {
+      logger.info('get maturity of %s...', storyPrelude)
 
       reader.getMaturity(ctx)
       .then((maturity) => {
@@ -298,8 +300,8 @@ async function createProfile(storyText, textPath) {
         res()
       })
     }),
-    new Promise(function(res) {
-      logger.info('get difficulty of %s...', storyText.substring(0, 20))
+    new Promise((res) => {
+      logger.info('get difficulty of %s...', storyPrelude)
 
       reader.getDifficulty(ctx)
       .then((difficulty) => {
@@ -309,12 +311,22 @@ async function createProfile(storyText, textPath) {
       })
     }),
     new Promise((res) => {
-      logger.info('get topics in %s...', storyText.substring(0, 20))
+      logger.info('get topics in %s...', storyPrelude)
 
-      return reader.getTopics(ctx)
+      reader.getTopics(ctx)
       .then((topics) => {
         ctx.profile.setTopics(topics)
         logger.info('profile.topics=%o', ctx.profile.topics)
+        res()
+      })
+    }),
+    new Promise((res) => {
+      logger.info('get ideologies in %s...', storyPrelude)
+
+      reader.getIdeologies(ctx)
+      .then((ideologies) => {
+        ctx.profile.setIdeologies(ideologies)
+        logger.info('profile.ideologies=%o', ctx.profile.ideologies)
         res()
       })
     })

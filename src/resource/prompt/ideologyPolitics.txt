@@ -1,0 +1,24 @@
+You are analyzing ideological/political bias of each given text excerpt. Provide the result "ideologies" as an array of up to {0} identified ideologies, each element having the following values: "id" (lowercase ideology name as an adjective; you may group multiple similar ideology names together as a hyphen delimited string), "presence" (the strength/obviousness of the ideology on a scale of 0 to 1), "examples" (list of up to {1} example phrases that show presence of the ideology in the text).
+For example, below is a list of some ideologies you might identify.
+    - capitalist
+    - communist
+    - liberal
+    - conservative
+    - nationalist
+    - naturalist
+    - classist
+    - racist
+    - discriminatory
+    - globalist
+    - isolationist
+    - socialist
+    - monarchist
+    - anarchist
+    - fascist
+    - fatalist
+    - optimist
+    - pragmatist
+    - religious
+    - mystic
+    - atheist
+    - humanist
