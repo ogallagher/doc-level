@@ -206,17 +206,26 @@ async function fetchStory(storiesDir, storyIndexPath, storyIndexName, storyIndex
     })
   )
 
+  const storyIndex = si.getStoriesIndex(storyIndexName)
+
   // download full story webpage to temp file
   const tempDir = path.join(`data/temp/${storyIndexName}/page-${storyIndexPage}/story-${storyId}`)
   await writer.initDir(tempDir)
   const storyWebpagePath = await writer.downloadWebpage(
     new URL(storySummary.url), 
-    path.join(tempDir, `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.html`),
+    path.join(
+      tempDir, 
+      `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}${storyIndex.storyFileExt}`
+    ),
     true
   )
 
   // convert story webpage to full text
-  const storyPage = await reader.parseHtml(storyWebpagePath)
+  const storyPage = (
+    storyIndex.storyFileExt === '.html'
+    ? (await reader.parseHtml(storyWebpagePath))
+    : (await reader.loadText(storyWebpagePath))
+  )
   const storyFullTextPath = path.join(
     storiesDir, storyIndexName, `story-${storyId}`, 
     `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.txt`
