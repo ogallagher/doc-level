@@ -25,7 +25,8 @@
   "scripts": {
     "test": "mocha test | pino-pretty -L info",
     "coverage": "nyc --reporter=text npm run test",
-    "cli": "node src/index.js -l warn | pino-pretty"
+    "cli": "node src/index.js -l warn | pino-pretty",
+    "test-render-markdown": "mkdir -p test/resource_out/render; npx -p @mermaid-js/mermaid-cli mmdc -i test/resource/render/markdown_mermaid.md -o test/resource_out/render/markdown_mermaid_svg.md --theme dark --backgroundColor #333"
   },
   "dependencies": {
     "axios": "^1.7.9",
@@ -46,5 +47,8 @@
   "nyc": {
     "all": true,
     "check-coverage": true
+  },
+  "optionalDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.4.2"
   }
 }

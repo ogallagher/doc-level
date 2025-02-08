@@ -1,5 +1,6 @@
 package-lock.json
 data
+test/resource_out
 
 # Logs
 logs
