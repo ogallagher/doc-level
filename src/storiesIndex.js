@@ -1,10 +1,10 @@
 import * as path from 'path'
-import { LibraryDescriptor } from './libraryDescriptor.js'
 import { RelationalTag } from 'relational_tags'
+import { LibraryDescriptor } from './libraryDescriptor.js'
+import { StorySummary } from './storySummary.js'
+import { IndexPage } from './indexPage.js'
 /**
  * @typedef {import('pino').Logger} Logger
- * 
- * @typedef {import('./messageSchema.js').Story} Story
  */
 
 /**
@@ -149,7 +149,7 @@ export class StoriesIndex extends LibraryDescriptor {
    * Parse a list of story summaries from the stories index page content.
    * 
    * @param {any} indexPage Parsed page (ex. `HTMLElement` from html page, or `object` from json page).
-   * @returns {Generator<Story>}
+   * @returns {Generator<StorySummary>}
    */
   *getStorySummaries(indexPage) {
     this.throwErrorNotImplemented()
@@ -172,6 +172,8 @@ export class StoriesIndex extends LibraryDescriptor {
   static initTags() {
     this.adoptTag(this.tUrlTemplate)
     this.adoptTag(this.tName)
+
+    this.adoptTag(IndexPage.t)
   }
 
   setTags() {
@@ -235,7 +237,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
 
   /**
    * @param {HTMLElement} indexPage 
-   * @returns {Generator<Story>}
+   * @returns {Generator<StorySummary>}
    */
   *getStorySummaries(indexPage) {
     logger.debug('isolate list of stories at selector=%s', MunjangStoriesIndex.selectorStories)
@@ -274,7 +276,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
         ))
 
         /**
-         * @type {Story}
+         * @type {StorySummary}
          */
         let storySummary = {
           authorName: author.trim(),
@@ -290,7 +292,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
         }
         logger.debug('stories[%s] summary object=%o', idx, storySummary)
 
-        yield storySummary
+        yield StorySummary.fromData(storySummary)
       }
       catch (err) {
         throw new Error(`failed to parse summary of stories[${idx}]`, {
@@ -393,7 +395,7 @@ export class PaisStoriesIndex extends StoriesIndex {
 
   /**
    * @param {HTMLElement} indexPage 
-   * @returns {Generator<Story>}
+   * @returns {Generator<StorySummary>}
    */
   *getStorySummaries(indexPage) {
     logger.debug('isolate list of articles at selector=%s', PaisStoriesIndex.selectorArticles)
@@ -421,7 +423,7 @@ export class PaisStoriesIndex extends StoriesIndex {
         )
 
         /**
-         * @type {Story}
+         * @type {StorySummary}
          */
         const summary = {
           authorName: author,
@@ -436,7 +438,7 @@ export class PaisStoriesIndex extends StoriesIndex {
         }
         logger.debug('articles[%s] summary object=%o', idx, summary)
 
-        yield summary
+        yield StorySummary.fromData(summary)
       }
       catch (err) {
         throw new Error(`failed to parse summary of articles[${idx}]`, {
@@ -556,7 +558,7 @@ export class WashingtonPostStoriesIndex extends StoriesIndex {
   *    in_url_headline: string
   *  }
   * }[]}} indexPage 
-  * @returns {Generator<Story>}
+  * @returns {Generator<StorySummary>}
   */
   *getStorySummaries(indexPage) {
     logger.debug('found %s articles in index page', indexPage.items.length)
@@ -564,7 +566,7 @@ export class WashingtonPostStoriesIndex extends StoriesIndex {
     for (let [idx, article] of indexPage.items.entries()) {
       try {
         /**
-         * @type {Story}
+         * @type {StorySummary}
          */
         const summary = {
           // tracking.author = display name
@@ -584,7 +586,7 @@ export class WashingtonPostStoriesIndex extends StoriesIndex {
         }
         logger.debug('articles[%s] summary object=%o', idx, summary)
 
-        yield summary
+        yield StorySummary.fromData(summary)
       }
       catch (err) {
         throw new Error(`failed to parse summary of articles[${idx}]`, {cause: err})
@@ -678,7 +680,7 @@ export class NaverBlogStoriesIndex extends StoriesIndex {
    *    sympathyEnable: boolean
    *  }[]
    * }}} indexPage
-   * @returns {Generator<Story>}
+   * @returns {Generator<StorySummary>}
    */
   *getStorySummaries(indexPage) {
     logger.debug('found %s posts in index page', indexPage.result.postList.length)
@@ -697,7 +699,7 @@ export class NaverBlogStoriesIndex extends StoriesIndex {
         childUrl.searchParams.set('logNo', post.logNo)
 
         /**
-         * @type {Story}
+         * @type {StorySummary}
          */
         const summary = {
           authorName: post.nickname,
@@ -714,7 +716,7 @@ export class NaverBlogStoriesIndex extends StoriesIndex {
         }
         logger.debug('posts[%s] summary object=%o', idx, summary)
 
-        yield summary
+        yield StorySummary.fromData(summary)
       }
       catch (err) {
         throw new Error(`failed to parse summary of posts[${idx}]`, {cause: err})
@@ -884,7 +886,7 @@ export class NuevoDiaStoriesIndex extends StoriesIndex {
    * 
    * @param {NuevoDiaArticle} article 
    * @param {NuevoDiaAuthor} author 
-   * @returns {Story|undefined}
+   * @returns {StorySummary|undefined}
    */
   getStorySummary(article, author) {
     if (article.contentRestriction === NuevoDiaStoriesIndex.RESTRICTION_PREMIUM) {
@@ -896,7 +898,7 @@ export class NuevoDiaStoriesIndex extends StoriesIndex {
     url.search = ''
     url.pathname = article.canonicalUrl
 
-    return {
+    return StorySummary.fromData({
       authorName: author.byline,
       title: article.headline,
       publishDate: new Date(article.displayDate),
@@ -906,7 +908,7 @@ export class NuevoDiaStoriesIndex extends StoriesIndex {
         article.subheadline
       ],
       id: `${author.id}_${article.id}`
-    }
+    })
   }
 
   /**
@@ -917,7 +919,7 @@ export class NuevoDiaStoriesIndex extends StoriesIndex {
    *  }[],
    *  articles?: NuevoDiaArticle[]
    * }} indexPage
-   * @returns {Generator<Story>}
+   * @returns {Generator<StorySummary>}
    */
   *getStorySummaries(indexPage) {
     let groups = indexPage.groups
@@ -1057,7 +1059,7 @@ export class ProjectGutenberg extends StoriesIndex {
   /**
    * 
    * @param {HTMLElement} indexPage 
-   * @returns {Generator<Story>}
+   * @returns {Generator<StorySummary>}
    */
   *getStorySummaries(indexPage) {
     let bookLinks = indexPage.querySelectorAll(ProjectGutenberg.selectorBookLink)
@@ -1065,7 +1067,7 @@ export class ProjectGutenberg extends StoriesIndex {
 
     logger.info('found %s books in index page', bookLinks.length)
     /**
-     * @type {Story}
+     * @type {StorySummary}
      */
     let prevSummary
     for (let b_idx=0; b_idx<bookLinks.length; b_idx++) {
@@ -1081,7 +1083,7 @@ export class ProjectGutenberg extends StoriesIndex {
         let url = new URL(this.urlTemplate)
         url.pathname = bookLinks[b_idx].getAttribute('href')
   
-        const summary = {
+        const summary = StorySummary.fromData({
           authorName: bookAuthors[b_idx].textContent,
           title: bookLinks[b_idx].textContent,
           publishDate: null,
@@ -1089,7 +1091,7 @@ export class ProjectGutenberg extends StoriesIndex {
           url: url.toString() + '.txt.utf-8',
           excerpts: [],
           id: path.parse(url.pathname).name
-        }
+        })
 
         if (summary.id !== prevSummary?.id) {
           prevSummary = summary

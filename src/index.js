@@ -13,6 +13,8 @@ import * as readline from 'node:readline/promises'
 import path from 'path'
 import { fileString } from './stringUtil.js'
 import * as lib from './library.js'
+import { StorySummary } from './storySummary.js'
+import { IndexPage } from './indexPage.js'
 /**
  * @typedef {import('./storiesIndex.js').Story} Story
  */
@@ -105,13 +107,6 @@ function fetchStorySummaries(storiesIndex, storiesMax, storiesDir) {
 }
 
 /**
- * @typedef {{
- *  indexName: string,
- *  pageNumber: number,
- *  filePath: string
- * }} IndexPage
- */
-/**
  * @param {string} storiesDir
  * @returns {Promise<Map<string, Map<number, IndexPage>>>}
  */
@@ -138,11 +133,11 @@ async function fetchStoryIndexPages(storiesDir) {
             logger.error('unable to parse stories index page path %s', indexPagePath)
           }
           else {
-            const indexPage = {
-              indexName: pagePathParse[1],
-              pageNumber: parseInt(pagePathParse[2]),
-              filePath: indexPagePath
-            }
+            const indexPage = new IndexPage(
+              pagePathParse[1],
+              parseInt(pagePathParse[2]),
+              indexPagePath
+            )
 
             if (indexPages.has(indexPage.indexName)) {
               indexPages.get(indexPage.indexName).set(indexPage.pageNumber, indexPage)
@@ -194,7 +189,7 @@ async function showAvailableStories(indexPages) {
  * @param {string} storyIndexName
  * @param {string} storyId
  *  
- * @returns {Promise<{storyText: string[], storySummary: ms.Story}>}
+ * @returns {Promise<{storyText: string[], storySummary: StorySummary}>}
  */
 async function fetchStory(storiesDir, storyIndexPath, storyIndexName, storyIndexPage, storyId) {
   // load story summary from index page
@@ -398,7 +393,7 @@ async function main(argSrc) {
    */
   let storyText
   /**
-   * @type {ms.Story}
+   * @type {StorySummary}
    */
   let storySummary
   

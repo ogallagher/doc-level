@@ -3,6 +3,8 @@
  */
 
 import { z } from 'zod'
+import { StorySummary } from './storySummary.js'
+
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -118,22 +120,12 @@ export let Stories = z.object({
   }))
 })
 Stories.name = 'Stories'
+
 /**
  * @typedef {{
- *  authorName: string,
- *  title: string,
- *  publishDate: Date,
- *  viewCount: number,
- *  url: string,
- *  excerpts: string[],
- *  id: string
- * }} Story Summary story info.
- * 
- * Not currently derived from a language model prompt, but rather explicitly parsed from a downloaded stories
- * index/listing page.
- */
-/**
- * @typedef {{
- *  stories: Story[]
+ *  stories: StorySummary[]
  * }} ExtractStoriesResponse
+ * 
+ * Note this does not technically contain `StorySummary` instances, but rather raw objects with the same
+ * attributes.
  */

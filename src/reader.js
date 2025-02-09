@@ -19,6 +19,7 @@ import {
   IDEOLOGY_EXAMPLES_MAX as _ideologyExamplesMax
 } from './config.js'
 import { StoriesIndex } from './storiesIndex.js'
+import { StorySummary } from './storySummary.js'
 import { downloadWebpage, fileExists, initDir, writeText } from './writer.js'
 
 /**
@@ -32,7 +33,6 @@ import { downloadWebpage, fileExists, initDir, writeText } from './writer.js'
  * @typedef {import('./messageSchema.js').ReadingDifficultyResponse} ReadingDifficultyResponse
  * @typedef {import('./messageSchema.js').ExtractStoriesResponse} ExtractStoriesResponse
  * @typedef {import('./messageSchema.js').TopicsResponse} TopicsResponse
- * @typedef {import('./messageSchema.js').Story} Story
  * @typedef {import('./messageSchema.js').IdeologiesResponse} IdeologiesResponse
  */
 
@@ -222,14 +222,14 @@ export function loadPrompt(templatePath, ...args) {
  * @param {number} storiesMax Max count of stories to fetch. Note the actual count of stories returned
  * will be rounded up to nearest whole page.
  * @param {string} storiesParentDir 
- * @returns {Promise<Map<number, Story[]>>} Paged list of stories.
+ * @returns {Promise<Map<number, StorySummary[]>>} Paged list of stories.
  */
 export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
   logger.info('fetch up to %s stories from %s and save to %s', storiesMax, storiesIndex, storiesParentDir)
   let pageNumber = storiesIndex.pageNumberMin
   let storiesCount = 0
   /**
-   * @type {Map<number, Story[]>}
+   * @type {Map<number, StorySummary[]>}
    */
   let pagedStories = new Map()
   /**
@@ -242,7 +242,7 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
   let storiesIndexPath
   let writeStoryPromises = []
   /**
-   * @type {Story[]}
+   * @type {StorySummary[]}
    */
   let storySummaries
   /**
@@ -294,11 +294,11 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
         .then(
           /**
            * 
-           * @param {Generator<Story>} storySummariesGenerator
+           * @param {Generator<StorySummary>} storySummariesGenerator
            */
           (storySummariesGenerator) => {
             /**
-             * @type {Story}
+             * @type {StorySummary}
              */
             let storySummary
             while (storySummary = storySummariesGenerator.next().value) {

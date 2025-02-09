@@ -2,11 +2,11 @@ import { RelationalTag, RelationalTagConnection } from 'relational_tags'
 import { LibraryDescriptor } from './libraryDescriptor.js'
 import { Difficulty, Ideology, Maturity, TextProfile, Topic } from './textProfile.js'
 import { StoriesIndex, getStoriesIndex } from './storiesIndex.js'
+import { StorySummary } from './storySummary.js'
+import { IndexPage } from './indexPage.js'
 import { loadText, loadProfile } from './reader.js'
 /**
  * @typedef {import('pino').Logger} Logger
- * @typedef {import('./messageSchema.js').Story} Story
- * @typedef {import('./index.js').IndexPage} IndexPage
  */
 
 /**
@@ -42,7 +42,11 @@ export function init(parentLogger) {
     Topic.initTags()
     Ideology.initTags()
     TextProfile.initTags()
+    StorySummary.initTags()
+    StoriesIndex.initTags()
+    IndexPage.initTags()
     LibraryBook.initTags()
+    Library.initTags()
 
     logger.debug('end init')
     res()
@@ -60,9 +64,9 @@ export async function getLibrary(indexPages, profilesDir) {
    */
   let pPages = []
   /**
-   * @type {LibraryBook[]}
+   * @type {Library}
    */
-  let books = []
+  const library = new Library()
 
   for (let page of indexPages) {
     logger.debug('create LibraryBook instance for each story in page-path=%s', page.filePath)
@@ -70,7 +74,7 @@ export async function getLibrary(indexPages, profilesDir) {
     .then(JSON.parse)
     .then(
       /**
-       * @param {Story[]} storySummaries 
+       * @param {StorySummary[]} storySummaries 
        */
       (storySummaries) => {
         return Promise.all(storySummaries.map(async (story) => {
@@ -86,13 +90,13 @@ export async function getLibrary(indexPages, profilesDir) {
             logger.trace(err)
           }
 
-          return {story, profile}
+          return {story: StorySummary.fromData(story), profile}
         }))
       }
     )
     .then((storyProfiles) => {
       storyProfiles.forEach(({story, profile}) => {
-        books.push(new LibraryBook(story, page, profile))
+        library.addBook(new LibraryBook(library, story, page, profile))
       })
     })
 
@@ -100,7 +104,7 @@ export async function getLibrary(indexPages, profilesDir) {
   }
 
   await Promise.all(pPages)
-  return new Library(books)
+  return library
 }
 
 /**
@@ -108,65 +112,95 @@ export async function getLibrary(indexPages, profilesDir) {
  * 
  * All items within the library are organized using [relational tagging](https://github.com/ogallagher/relational_tags).
  */
-export class Library {
-  /**
-   * @param {LibraryBook[]} books 
-   */
-  constructor(books) {
+export class Library extends LibraryDescriptor {
+  static t = RelationalTag.new('library')
+
+  constructor() {
+    // library is root of hierarchy; no parent
+    super(undefined)
+
     /**
-     * @type {LibraryBook[]}
+     * @type {Map<string, LibraryBook>}
      */
-    this.books = books
-    logger.info('created library of %s items', books.length)
+    this.books = new Map()
+
+    this.setTags()
+    logger.info('created empty library')
+  }
+
+  /**
+   * Create unique id for the given book.
+   * 
+   * Current implementation includes the index name nad page number, so if the same story id is present
+   * on multiple pages, for example, they will are added as separate books.
+   * 
+   * @param {LibraryBook} book 
+   * @returns {string}
+   */
+  static _getKey(book) {
+    return [book.index.name, book.indexPage.pageNumber, book.story.id].join('-')
+  }
+
+  /**
+   * 
+   * @param {LibraryBook} book 
+   */
+  addBook(book) {
+    this.books.set(Library._getKey(book), book)
+    book.setTags()
+  }
+
+  static initTags() {
+    this.adoptTag(LibraryBook.t)
+  }
+
+  setTags() {
+    Library.t.connect_to(this)
+    // does not call books.setTags because this is done when each book is added.
   }
 }
 
 export class LibraryBook extends LibraryDescriptor {
   static t = RelationalTag.new('library-book')
 
-  // extra tags for Story and IndexPage attributes are currently defined here since these types are not proper classes.
-  static tStory = RelationalTag.new('story')
-  static tAuthorName = RelationalTag.new('author-name')
-  static tTitle = RelationalTag.new('title')
-
-  static tIndexPage = RelationalTag.new('index-page')
-  static tPageNumber = RelationalTag.new('page-number')
-  static tPagePath = RelationalTag.new('page-path')
-
   /**
-   * @param {Story} story 
+   * @param {LibraryDescriptor} parent
+   * @param {StorySummary} story 
    * @param {IndexPage} indexPage 
    * @param {TextProfile|undefined} profile 
    */
-  constructor(story, indexPage, profile) {
-    super()
+  constructor(parent, story, indexPage, profile) {
+    super(parent)
 
     /**
-     * @type {Story}
+     * @type {StorySummary}
      */
     this.story = story
+    this.story.setParent(this)
+
     /**
      * @type {IndexPage}
      */
     this.indexPage = indexPage
+    this.indexPage.setParent(this)
+
     /**
      * @type {StoriesIndex}
      */
     this.index = getStoriesIndex(indexPage.indexName)
+    // indexes do not have separate instances for each book, so they belong directly to the library
+    this.index.setParent(parent)
+
     /**
      * @type {TextProfile|undefined}
      */
     this.profile = profile
+    this.profile?.setParent(this)
   }
 
   static initTags() {
-    this.adoptTag(this.tStory)
-    this.tStory.connect_to(this.tAuthorName, TYPE_TO_TAG_CHILD)
-    this.tStory.connect_to(this.tTitle, TYPE_TO_TAG_CHILD)
-
-    this.adoptTag(this.tIndexPage)
-    this.tIndexPage.connect_to(this.tPageNumber, TYPE_TO_TAG_CHILD)
-    this.tIndexPage.connect_to(this.tPagePath, TYPE_TO_TAG_CHILD)
+    // currently, index-page is child of both library-book and stories-index tags.
+    this.adoptTag(IndexPage.t)
 
     this.adoptTag(StoriesIndex.t)
 
@@ -174,16 +208,9 @@ export class LibraryBook extends LibraryDescriptor {
   }
 
   setTags() {
-    LibraryBook.tStory.connect_to(this.story)
-    LibraryBook.tAuthorName.connect_to(this.story.authorName)
-    LibraryBook.tTitle.connect_to(this.story.title)
-
-    LibraryBook.tIndexPage.connect_to(this.indexPage)
-    LibraryBook.tPageNumber.connect_to(this.indexPage.pageNumber)
-    LibraryBook.tPagePath.connect_to(this.indexPage.filePath)
-
+    this.story.setTags()
+    this.indexPage.setTags()
     this.index.setTags()
-
-    this.profile.setTags()
+    this.profile?.setTags()
   }
 }

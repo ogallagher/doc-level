@@ -35,7 +35,7 @@ export class Maturity extends LibraryDescriptor {
   static t = RelationalTag.new('maturity')
   // maturity types will be added on demand
   static tRestricted = RelationalTag.new('restricted')
-  static tExample = RelationalTag.new('example')
+  static tExample = RelationalTag.new('maturity-example')
 
   constructor(isRestricted=undefined, presents=[], absents=[], examples=[]) {
     super()
@@ -217,7 +217,7 @@ export class Ideology extends LibraryDescriptor {
     Ideology.adoptTag(tid)
     tid.connect_to(this)
 
-    tPresence.connect_to(this, undefined, this.presence)
+    Ideology.tPresence.connect_to(this, undefined, this.presence)
 
     // example phrases are not tagged
   }
@@ -240,43 +240,47 @@ export class TextProfile extends LibraryDescriptor {
     /**
      * @type {Maturity}
      */
-    this.maturity = Maturity.fromData(data?.maturity)
+    this.maturity
+    this.setMaturity(Maturity.fromData(data?.maturity))
     /**
      * @type {Difficulty}
      */
-    this.difficulty = Difficulty.fromData(data?.difficulty)
+    this.difficulty
+    this.setDifficulty(Difficulty.fromData(data?.difficulty))
     /**
      * @type {Topic[]}
      */
-    this.topics = (
-      data?.topics !== undefined
-      ? data.topics.map((t) => Topic.fromData(t))
-      : []
-    )
+    this.topics = []
+    if (data?.topics !== undefined) {
+      this.setTopics(data.topics.map((t) => Topic.fromData(t)))
+    }
     /**
      * @type {Ideology[]}
      */
-    this.ideologies = (
-      data?.ideologies !== undefined
-      ? data.ideologies.map((i) => Ideology.fromData(i))
-      : []
-    )
+    this.ideologies = []
+    if (data?.ideologies !== undefined) {
+      this.setIdeologies(data.ideologies.map((i) => Ideology.fromData(i)))
+    }
   }
   
   setMaturity(maturity) {
     this.maturity = maturity
+    this.maturity.setParent(this)
   }
 
   setDifficulty(difficulty) {
     this.difficulty = difficulty
+    this.difficulty.setParent(this)
   }
 
   setTopics(topics) {
     this.topics = topics
+    this.topics.forEach((topic) => topic.setParent(this))
   }
 
   setIdeologies(ideologies) {
     this.ideologies = ideologies
+    this.ideologies.forEach((ideology) => ideology.setParent(this))
   }
 
   static initTags() {
