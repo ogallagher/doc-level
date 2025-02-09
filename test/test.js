@@ -1,11 +1,16 @@
 import assert from 'assert'
 import pino from 'pino'
 import path from 'path'
+import { RelationalTag } from 'relational_tags'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
 import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml, reduceStory } from '../src/reader.js'
 import * as storiesIndex from '../src/storiesIndex.js'
+import { Library, LibraryBook, init as libraryInit } from '../src/library.js'
+import { IndexPage } from '../src/indexPage.js'
+import { StorySummary } from '../src/storySummary.js'
+import { LibraryDescriptor } from '../src/libraryDescriptor.js'
 
 const logger = pino(
   {
@@ -157,7 +162,7 @@ describe('storiesIndex', function() {
      */
     let mji
 
-    this.beforeAll(function() {
+    before(function() {
       asi = new storiesIndex.StoriesIndex('https://host.tld', ['abstract0'])
       mji = new storiesIndex.MunjangStoriesIndex()
 
@@ -206,6 +211,133 @@ describe('storiesIndex', function() {
             }
           })
         })
+      })
+    })
+  })
+})
+
+describe('library', () => {
+  /**
+   * @type {Library}
+   */
+  let library
+  /**
+   * @type {LibraryBook}
+   */
+  let book1
+  /**
+   * @type {LibraryBook}
+   */
+  let book2
+
+  before(async () => {
+    await libraryInit(logger)
+    library = new Library()
+
+    let index1 = new storiesIndex.StoriesIndex('https://host.tld', ['index1', 'i1'])
+
+    let page1 = new IndexPage(
+      index1.name, 
+      1, 
+      path.join(import.meta.dirname, 'resource/stories/index1/page-1/index.json')
+    )
+    let page1Stories = await loadText(page1.filePath).then(JSON.parse)
+
+    let story1 = StorySummary.fromData(page1Stories[0])
+    let story2 = StorySummary.fromData(page1Stories[1])
+    
+    let profile1 = await loadText(path.join(
+      import.meta.dirname, 
+      `resource/profiles/index1/story-142/Twain,-Mark_The-$30,000-Bequest,-and-Other-Stories_excerpt.txt.profile.json`
+    ))
+    .then(JSON.parse)
+    .then((profileData) => new textProfile.TextProfile(profileData))
+
+    book1 = new LibraryBook(library, story1, page1, profile1)
+    book2 = new LibraryBook(library, story2, page1, undefined)
+  })
+
+  describe('LibraryBook', () => {
+    it('handles unprofiled stories', () => {
+      assert.strictEqual(library.books.size, 0)
+      library.addBook(book2)
+      assert.strictEqual(library.books.size, 1)
+
+      assert.ok(
+        !textProfile.Difficulty.tReadingLevel.connections.has(book2), 
+        `book ${Library._getKey(book2)} without profile should not be connected to tag ${textProfile.Difficulty.tReadingLevel.name}`
+      )
+      // text-profile.topic.trout-competition
+      assert.strictEqual(RelationalTag.get('trout-competition').connections.size, 0)
+    })
+
+    it('handles profiled stories', () => {
+      library.addBook(book1)
+
+      // text-profile.difficulty.years-of-education weighted connection
+      let connYearsOfEducation = RelationalTag.get('years-of-education').connections.get(book1.profile.difficulty)
+      assert.strictEqual(connYearsOfEducation.weight, book1.profile.difficulty.yearsOfEducation)
+
+      // text-profile.topic.dreams-and-aspirations
+      assert.strictEqual(book1.profile.topics[1].id, 'dreams-and-aspirations')
+      RelationalTag.get('dreams-and-aspirations').connections.has(book1.profile.topics[1])
+    })
+  })
+
+  describe('LibraryDescriptor implementations', () => {
+    it('always have references to a library to which they belong', () => {
+      /**
+       * @type {LibraryDescriptor}
+       */
+      let ld
+      for (ld of [
+        book1, 
+        book1.index, 
+        book1.indexPage, 
+        book1.profile, book1.profile.ideologies[0], book1.profile.difficulty, book1.profile.topics[0]
+      ]) {
+        /**
+         * @type {LibraryDescriptor}
+         */
+        let root = ld
+        while (root.parent !== undefined) {
+          root = root.parent
+        }
+
+        assert.ok(root instanceof Library)
+      }
+    })
+
+    it('have expected tag relationships', () => {
+      for (let [a, b, d] of [
+        // library has book
+        [Library.t, LibraryBook.t, 1],
+        // book has story, index-page, profile
+        [LibraryBook.t, IndexPage.t, 1],
+        [LibraryBook.t, StorySummary.t, 1],
+        [LibraryBook.t, textProfile.TextProfile.t, 1],
+        // library has index
+        [storiesIndex.StoriesIndex.t, Library.t, 1],
+        // index name belongs to page (and index)
+        [IndexPage.t, storiesIndex.StoriesIndex.tName, 1],
+        // and page belongs to index 
+        [IndexPage.t, storiesIndex.StoriesIndex.t, 1], 
+        // transitive property a--c = a--b + b--c
+        [Library.t, textProfile.TextProfile.t, 2], // library--book--profile
+        [StorySummary.tAuthorName, StorySummary.tTitle, 2], // author-name--story--title
+        [StorySummary.tAuthorName, textProfile.Ideology.t, 4], //author-name--story--book--profile--ideology
+      ]) {
+        assert.strictEqual(
+          RelationalTag.graph_distance(a, b), 
+          d, 
+          `graph distance from ${a.name} to ${b.name} should be ${d}`
+        )
+      }
+    })
+
+    it('are the only tagged entities', () => {
+      [...RelationalTag._tagged_entities.keys()].forEach((ent) => {
+        assert.ok(ent instanceof LibraryDescriptor)
       })
     })
   })

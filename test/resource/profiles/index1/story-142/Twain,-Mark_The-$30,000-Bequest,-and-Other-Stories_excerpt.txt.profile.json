@@ -1,0 +1,205 @@
+{
+  "maturity": {
+    "isRestricted": false,
+    "presents": [],
+    "absents": [
+      "sexual",
+      "hate",
+      "harassment",
+      "self-harm",
+      "sexual/minors",
+      "hate/threatening",
+      "violence/graphic",
+      "self-harm/intent",
+      "self-harm/instructions",
+      "harassment/threatening",
+      "violence",
+      "profanity"
+    ],
+    "examples": []
+  },
+  "difficulty": {
+    "yearsOfEducation": 12,
+    "readingLevelName": "high school",
+    "reasons": [
+      "The use of intricate sentence structures is prevalent throughout the text.",
+      "Inclusion of historical and cultural references that require broader knowledge.",
+      "Characters' names and complex relationships are revealed without extensive explanation.",
+      "Vocabulary includes specialized terms from economics and gardening which may not be common for all readers.",
+      "Dialogue contains idiomatic expressions and regional dialects which may confuse non-native speakers.",
+      "The narrative style is rich with descriptive language that may challenge comprehension.",
+      "References to societal norms and religious practices may require contextual understanding.",
+      "Themes of aspiration and class dynamics are presented, adding layers of complexity to the narrative.",
+      "Allusions to larger societal issues may require critical thinking to fully grasp the implications.",
+      "Cultural and lifestyle differences depicted may present challenges for contemporary readers. "
+    ],
+    "difficultWords": [
+      "accommodations",
+      "inhabitants",
+      "Prospect",
+      "sect",
+      "plant",
+      "capable",
+      "helpmeet",
+      "dabbler",
+      "vegetable",
+      "shares",
+      "banked",
+      "expenses",
+      "thenceforth",
+      "furnished",
+      "comfortable",
+      "aspiration",
+      "concede",
+      "remainder",
+      "decadent",
+      "salaried"
+    ],
+    "difficultPhrases": [
+      "church accommodations for thirty-five thousand",
+      "dreamer of dreams",
+      "farmed on shares",
+      "a handsome figure indeed",
+      "built and furnished a pretty house",
+      "banked two hundred a year",
+      "marriage-week",
+      "climbed steadily up",
+      "sociable friendliness",
+      "prevailing atmosphere"
+    ]
+  },
+  "topics": [
+    {
+      "id": "community",
+      "examplePhrases": [
+        "a pleasant little town",
+        "everybody knew everybody",
+        "sociable friendliness",
+        "church accommodations for thirty-five thousand",
+        "the Far West and the South",
+        "represented Protestant sects"
+      ]
+    },
+    {
+      "id": "dreams-and-aspirations",
+      "examplePhrases": [
+        "a private dabbler in romance",
+        "dreamer of dreams",
+        "buy an acre of ground",
+        "made it pay her a hundred percent",
+        "banked two hundred a year",
+        "capable helpmeet"
+      ]
+    },
+    {
+      "id": "financial-struggles",
+      "examplePhrases": [
+        "high-salaried man",
+        "climbed steadily up",
+        "wage had remained eight hundred",
+        "when she had been married seven years",
+        "forty dollars a year",
+        "her fortune"
+      ]
+    },
+    {
+      "id": "family-and-relationships",
+      "examplePhrases": [
+        "wife, Electra",
+        "two children had arrived",
+        "move her family in",
+        "married child",
+        "helpmeet",
+        "growing expenses"
+      ]
+    },
+    {
+      "id": "hard-work-and-perseverance",
+      "examplePhrases": [
+        "farmed on shares",
+        "instituted a vegetable garden",
+        "put thirty dollars in the savings-bank",
+        "out of his second",
+        "out of his third"
+      ]
+    },
+    {
+      "id": "gender-roles",
+      "examplePhrases": [
+        "only high-salaried man",
+        "capable helpmeet",
+        "private dabbler in romance",
+        "child as she was",
+        "her marriage",
+        "the danger of lying in bed"
+      ]
+    }
+  ],
+  "ideologies": [
+    {
+      "id": "globalist",
+      "presence": 0.7,
+      "examplePhrases": [
+        "loss of bipartisanship",
+        "deficit of American leadership",
+        "we can’t let Russia dictate what happens in Europe",
+        "help create a Europe whole and free",
+        "Americans worry about a deficit of American leadership",
+        "Ruthlessness edge.",
+        "we’ve seen much chaos at home and abroad"
+      ]
+    },
+    {
+      "id": "liberal-conservative",
+      "presence": 0.6,
+      "examplePhrases": [
+        "many people in the United States and around the world would agree with her",
+        "the amicable spirit...often disappears",
+        "diplomatic, saying nice things about the current inhabitant",
+        "had spent the past two weeks hammering at the institutions of a government"
+      ]
+    },
+    {
+      "id": "optimist",
+      "presence": 0.5,
+      "examplePhrases": [
+        "American democracy can withstand a few knocks",
+        "Optimism about America’s long-term future is probably right",
+        "it always has been in the past",
+        "I suspect Trump meets her ‘ruthlessness’ test",
+        "expressed genuine worry was the future of Ukraine"
+      ]
+    },
+    {
+      "id": "hawkish-isolationist",
+      "presence": 0.4,
+      "examplePhrases": [
+        "human survival was in part a product of our warlike instincts",
+        "After the Berlin Wall came down, America helped create a Europe",
+        "doing enormous damage in the short run",
+        "most chaotic period in American politics"
+      ]
+    },
+    {
+      "id": "nationalist",
+      "presence": 0.3,
+      "examplePhrases": [
+        "we can’t allow Russia to walk everybody back",
+        "worry about a regime that lacks a ruthless edge",
+        "the danger of a peace deal that would reward Russian aggression",
+        "needing to stop the fighting in Ukraine"
+      ]
+    },
+    {
+      "id": "classist",
+      "presence": 0.2,
+      "examplePhrases": [
+        "grand oval of her dining table",
+        "fancy meal and stay for after-dinner drinks",
+        "champagne glasses racked along the entry hallway",
+        "ambassador’s residence often disappears when members of Congress",
+        "the powerful versus common citizens"
+      ]
+    }
+  ]
+}

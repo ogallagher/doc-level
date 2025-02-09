@@ -1,0 +1,122 @@
+{
+  "maturity": {
+    "isRestricted": false,
+    "presents": [],
+    "absents": [
+      "sexual",
+      "hate",
+      "harassment",
+      "self-harm",
+      "sexual/minors",
+      "hate/threatening",
+      "violence/graphic",
+      "self-harm/intent",
+      "self-harm/instructions",
+      "harassment/threatening",
+      "violence",
+      "profanity"
+    ],
+    "examples": []
+  },
+  "difficulty": {
+    "yearsOfEducation": 12,
+    "readingLevelName": "high school",
+    "reasons": [
+      "Use of advanced vocabulary and idiomatic expressions.",
+      "Complex sentence structures that require comprehension skills.",
+      "Inclusion of specific cultural references known primarily to those familiar with Korean pop culture.",
+      "Thematic depth involving emotions and dramatic performances that may need critical thinking to fully appreciate.",
+      "Presence of figurative language that complicates literal understanding.",
+      "Names of songs and artists are overshadowed by contextual meanings that may not be universally recognized.",
+      "Narrative style requires understanding of context and progression of events in the competition.",
+      "Challenge in following the shifts in perspective between different characters and participants.",
+      "Requires background knowledge of the genre (trot) and its cultural significance in Korea.",
+      "The excerpt reflects analytical and evaluative responses indicating a higher level of critical reading. "
+    ],
+    "difficultWords": [
+      "이변",
+      "감성적인",
+      "애절한",
+      "충격적",
+      "절절한",
+      "명곡",
+      "심사위원",
+      "쿨함",
+      "속내",
+      "강렬한"
+    ],
+    "difficultPhrases": [
+      "예상치 못한 이변",
+      "한 편의 드라마를 보는 듯한 무대",
+      "감동적인 무대를 선사"
+    ]
+  },
+  "topics": [
+    {
+      "id": "trout-competition",
+      "examplePhrases": [
+        "트로트 서바이벌",
+        "트로트의 감성을 전달하는",
+        "가왕 결정 전의 대결",
+        "치열한 경쟁 속에서",
+        "트로트 황제의 탄생을 향해",
+        "1차 준결승전의 반전"
+      ]
+    },
+    {
+      "id": "emotion-and-drama",
+      "examplePhrases": [
+        "애절한 감성이 돋보이는",
+        "한 편의 드라마를 보는 듯한 무대",
+        "감동적이고 애틋한",
+        "모정의 깊은 감성",
+        "관객들의 가슴을 저미게",
+        "눈시울을 붉히기에 충분한 무대"
+      ]
+    },
+    {
+      "id": "unexpected-results",
+      "examplePhrases": [
+        "예상치 못한 이변",
+        "예상 밖의 돌풍을 일으키는",
+        "충격적인 최저점을 기록",
+        "예상을 완전히 뒤엎는 결과",
+        "상위권에 머물던 참가자들이 흔들리고",
+        "방출 후보로 이름을 올리며 위기"
+      ]
+    },
+    {
+      "id": "musical-performance",
+      "examplePhrases": [
+        "감성적인 무대를 선보였습니다",
+        "정통 트로트의 깊은 감성",
+        "가창력과 감성으로 무대를 장악",
+        "완성된 독보적인 무대",
+        "강렬한 무대를 선보이며",
+        "최고 점수를 기록하는 기염을 토했습니다"
+      ]
+    },
+    {
+      "id": "audience-reaction",
+      "examplePhrases": [
+        "관객들의 귀를 사로잡았고",
+        "객석에서는 여기저기서 훌쩍이는 소리",
+        "연예인 판정단과 방청객들도 놀란 기색",
+        "그의 낮은 점수는 큰 충격으로",
+        "팬들의 예상을 완전히 뒤엎는結果",
+        "관객들과 심사위원들의 눈시울을 붉히기에"
+      ]
+    },
+    {
+      "id": "survival-show",
+      "examplePhrases": [
+        "계속되는 감동과 반전",
+        "국가대표 서바이벌 프로그램",
+        "결승 진출 가능성을 높였습니다",
+        "매회 명곡이 탄생하는 무대",
+        "마지막 결승 티켓은 누구에게 돌아갈까요?",
+        "“현역가왕”이라는 영예를 거머쥐게 될까요?"
+      ]
+    }
+  ]
+}
