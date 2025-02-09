@@ -1,3 +1,6 @@
+import { RelationalTag } from "relational_tags"
+import { LibraryDescriptor } from './libraryDescriptor.js'
+import { TYPE_TO_TAG_CHILD } from './library.js'
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -13,6 +16,7 @@ export const MATURITY_TYPE_PROFANE = 'profanity'
  * Init module logger.
  * 
  * @param {Logger} parentLogger
+ * @returns {Promise<undefined>}
  */
 export function init(parentLogger) {
   return new Promise(function(res) {
@@ -27,24 +31,34 @@ export function init(parentLogger) {
   })
 }
 
-export class Maturity {  
+export class Maturity extends LibraryDescriptor {  
+  static t = RelationalTag.new('maturity')
+  // maturity types will be added on demand
+  static tRestricted = RelationalTag.new('restricted')
+  static tExample = RelationalTag.new('example')
+
   constructor(isRestricted=undefined, presents=[], absents=[], examples=[]) {
-   /**
-    * @type {boolean?}
-    */ 
+    super()
+    /**
+     * @type {boolean?}
+     */ 
     this.isRestricted = isRestricted
     /**
      * @type {string[]}
      */
     this.presents = presents
-   /**
-    * @type {string[]}
-    */ 
+    /**
+      * @type {string[]}
+      */ 
     this.absents = absents
     /**
      * @type {string[]}
      */
     this.examples = examples
+  }
+
+  static fromData({isRestricted, presents, absents, examples}) {
+    return new Maturity(isRestricted, presents, absents, examples)
   }
   
   /**
@@ -55,13 +69,51 @@ export class Maturity {
     this.presents = this.presents.concat(other.presents)
     this.absents = this.absents.concat(other.absents)
   }
+
+  static initTags() {
+    this.adoptTag(this.tRestricted)
+    this.adoptTag(this.tExample)
+  }
+
+  setTags() {
+    if (this.isRestricted) {
+      Maturity.tRestricted.connect_to(this)
+    }
+    else {
+      Maturity.tRestricted.disconnect_to(this)
+    }
+    /**
+     * Tag for each maturity type.
+     * @type {RelationalTag}
+     */
+    let mt
+    for (let maturityType of this.presents) {
+      mt = RelationalTag.get(maturityType)
+      Maturity.adoptTag(mt)
+      mt.connect_to(this)
+    }
+
+    for (let maturityType of this.absents) {
+      mt = RelationalTag.get(maturityType)
+      Maturity.adoptTag(mt)
+      mt.disconnect_to(this)
+    }
+
+    // examples are not tagged
+  }
 }
 
 /**
  * Reading difficulty.
  */
-export class Difficulty {
+export class Difficulty extends LibraryDescriptor {
+  static t = RelationalTag.new('difficulty')
+  static tYearsOfEducation = RelationalTag.new('years-of-education')
+  static tReadingLevel = RelationalTag.new('reading-level')
+
   constructor(yearsOfEducation=0, readingLevelName, reasons=[], difficultWords=[], difficultPhrases=[]) {
+    super()
+
     /**
      * @type {number}
      */
@@ -74,10 +126,34 @@ export class Difficulty {
     this.difficultWords = difficultWords
     this.difficultPhrases = difficultPhrases
   }
+
+  static fromData({yearsOfEducation, readingLevelName, reasons, difficultWords, difficultPhrases}) {
+    return new Difficulty(yearsOfEducation, readingLevelName, reasons, difficultWords, difficultPhrases)
+  }
+
+  static initTags() {
+    this.adoptTag(this.tYearsOfEducation)
+    this.adoptTag(this.tReadingLevel)
+  }
+
+  setTags() {
+    Difficulty.tYearsOfEducation.connect_to(this, undefined, this.yearsOfEducation)
+
+    let tLevel = RelationalTag.get(this.readingLevelName)
+    Difficulty.tReadingLevel.connect_to(tLevel, TYPE_TO_TAG_CHILD)
+    tLevel.connect_to(this)
+
+    // reasons are not tagged
+    // difficult words,phrases are not tagged
+  }
 }
 
-export class Topic {
+export class Topic extends LibraryDescriptor {
+  static t = RelationalTag.new('topic')
+
   constructor(id, examplePhrases=[]) {
+    super()
+
     /**
      * @type {string}
      */
@@ -87,10 +163,31 @@ export class Topic {
      */
     this.examplePhrases = examplePhrases
   }
+
+  static fromData({id, examplePhrases}) {
+    return new Topic(id, examplePhrases)
+  }
+
+  static initTags() {
+    // no child tags yet
+  }
+
+  setTags() {
+    let tid = RelationalTag.get(this.id)
+    Topic.adoptTag(tid)
+    tid.connect_to(this)
+
+    // example phrases are not tagged
+  }
 }
 
-export class Ideology {
+export class Ideology extends LibraryDescriptor {
+  static t = RelationalTag.new('ideology')
+  static tPresence = RelationalTag.new('presence')
+
   constructor(id, presence, examplePhrases=[]) {
+    super()
+
     /**
      * @type {string}
      */
@@ -106,23 +203,64 @@ export class Ideology {
      */
     this.examplePhrases = examplePhrases
   }
+
+  static fromData({id, presence, examplePhrases}) {
+    return new Ideology(id, presence, examplePhrases)
+  }
+
+  static initTags() {
+    this.adoptTag(this.tPresence)
+  }
+
+  setTags() {
+    let tid = RelationalTag.get(this.id)
+    Ideology.adoptTag(tid)
+    tid.connect_to(this)
+
+    tPresence.connect_to(this, undefined, this.presence)
+
+    // example phrases are not tagged
+  }
 }
 
-export class TextProfile {
-  constructor() {
+export class TextProfile extends LibraryDescriptor {
+  static t = RelationalTag.new('text-profile')
+
+  /**
+   * @param {{
+   *  maturity?: Maturity,
+   *  difficulty?: Difficulty,
+   *  topics?: Topic[],
+   *  ideologies?: Ideology[]
+   * }|undefined} data Optional deserialized object.
+   */
+  constructor(data) {
+    super()
+    
     /**
      * @type {Maturity}
      */
-    this.maturity = new Maturity()
-    this.difficulty = new Difficulty()
+    this.maturity = Maturity.fromData(data?.maturity)
+    /**
+     * @type {Difficulty}
+     */
+    this.difficulty = Difficulty.fromData(data?.difficulty)
     /**
      * @type {Topic[]}
      */
-    this.topics = []
+    this.topics = (
+      data?.topics !== undefined
+      ? data.topics.map((t) => Topic.fromData(t))
+      : []
+    )
     /**
      * @type {Ideology[]}
      */
-    this.ideologies = []
+    this.ideologies = (
+      data?.ideologies !== undefined
+      ? data.ideologies.map((i) => Ideology.fromData(i))
+      : []
+    )
   }
   
   setMaturity(maturity) {
@@ -139,5 +277,19 @@ export class TextProfile {
 
   setIdeologies(ideologies) {
     this.ideologies = ideologies
+  }
+
+  static initTags() {
+    this.adoptTag(Maturity.t)
+    this.adoptTag(Difficulty.t)
+    this.adoptTag(Topic.t)
+    this.adoptTag(Ideology.t)
+  }
+
+  setTags() {
+    this.maturity.setTags()
+    this.difficulty.setTags()
+    this.topics.forEach((t) => t.setTags())
+    this.ideologies.forEach((i) => i.setTags())
   }
 }

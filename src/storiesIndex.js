@@ -1,4 +1,6 @@
 import * as path from 'path'
+import { LibraryDescriptor } from './libraryDescriptor.js'
+import { RelationalTag } from 'relational_tags'
 /**
  * @typedef {import('pino').Logger} Logger
  * 
@@ -55,7 +57,11 @@ export function getStoriesIndex(name) {
   return storiesIndexes.get(name)
 }
 
-export class StoriesIndex {
+export class StoriesIndex extends LibraryDescriptor {
+  static t = RelationalTag.new('stories-index')
+  static tUrlTemplate = RelationalTag.new('url-template')
+  static tName = RelationalTag.new('index-name')
+
   /**
    * 
    * @param {string} urlTemplate 
@@ -72,6 +78,8 @@ export class StoriesIndex {
     pageRequestHeaders = undefined,
     storyFileExt = '.html'
   ) {
+    super()
+    
     /**
      * @type {URL}
      */
@@ -159,6 +167,16 @@ export class StoriesIndex {
 
   toString() {
     return `StoriesIndex[${this.name}=${this.urlTemplate.hostname}]`
+  }
+
+  static initTags() {
+    this.adoptTag(this.tUrlTemplate)
+    this.adoptTag(this.tName)
+  }
+
+  setTags() {
+    StoriesIndex.tUrlTemplate.connect_to(this.urlTemplate)
+    StoriesIndex.tName.connect_to(this.name)
   }
 }
 

@@ -11,7 +11,8 @@ import * as si from './storiesIndex.js'
 import pino from 'pino'
 import * as readline from 'node:readline/promises'
 import path from 'path'
-import { regexpEscape, fileString } from './stringUtil.js'
+import { fileString } from './stringUtil.js'
+import * as lib from './library.js'
 /**
  * @typedef {import('./storiesIndex.js').Story} Story
  */
@@ -35,7 +36,8 @@ function init() {
     tp.init(logger),
     ms.init(logger),
     writer.init(logger),
-    si.init(logger)
+    si.init(logger),
+    lib.init(logger)
   ])
   // config
   .then(() => {
@@ -66,12 +68,19 @@ function init() {
   })
 }
 
-function getArgSrc() {
+/**
+ * 
+ * @param {boolean} showHelp 
+ * @returns 
+ */
+function getArgSrc(showHelp) {
   /**
    * @type {readline.Interface}
    */
   let rl
-  return config.argParser.getHelp()
+  return (
+    showHelp ? config.argParser.getHelp() : Promise.resolve('')
+  )
   .then((prompt) => {
     rl = readline.createInterface({
       input: process.stdin,
@@ -393,9 +402,24 @@ async function main(argSrc) {
    */
   let storySummary
   
-  if (args.story === undefined) {
+  if (args.story === undefined && args.showLibrary === undefined) {
     // show available local story lists if no story selected
     await showAvailableStories(indexPages)
+  }
+  else if (args.showLibrary !== undefined) {
+    logger.info('show library in format=%s', args.showLibrary)
+
+    const library = await lib.getLibrary(
+      // for each index
+      [...indexPages.values()]
+      .map((pages) => {
+        // for each page number, return page objects
+        return [...pages.values()]
+      })
+      .flat(),
+      args.profilesDir
+    )
+    console.log(library)
   }
 
   if (args.story !== undefined) {
@@ -443,11 +467,18 @@ async function main(argSrc) {
   }
 
   // loop main
-  getArgSrc().then(main)
+  getArgSrc(true).then(main)
 }
 
 // init
 init()
 // main
-.then(main)
+.then(
+  main,
+  (initErr) => {
+    throw new Error(`error during initialization`, {
+      cause: initErr
+    })
+  }
+)
 

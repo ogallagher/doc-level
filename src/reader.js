@@ -8,7 +8,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import * as HtmlParser from 'node-html-parser'
 import { Maturity, TextProfile, Difficulty, Topic, MATURITY_TYPE_PROFANE, Ideology } from './textProfile.js'
 import { CustomMaturityTypes, Ideologies, ReadingDifficulty, Topics } from './messageSchema.js'
-import { formatString } from './stringUtil.js'
+import { formatString, regexpEscape } from './stringUtil.js'
 import {
   READING_DIFFICULTY_REASONS_MAX as _difficultReasonsMax,
   READING_DIFFICULTY_WORDS_MIN as _difficultWordsMin,
@@ -695,4 +695,31 @@ export function listFiles(dir, pattern) {
       })
     }
   )
+}
+
+/**
+ * 
+ * @param {string} storyId 
+ * @param {string} profilesDir
+ */
+export function loadProfile(storyId, profilesDir) {
+  const profilePattern = new RegExp(regexpEscape(`story-${storyId}`) + '/.+profile.json$')
+  logger.debug('story %s profile search pattern=%s', storyId, profilePattern)
+
+  return listFiles(profilesDir, profilePattern)
+  .then((storyPaths) => {
+    if (storyPaths.length !== 1) {
+      throw new Error(`unable to find profile for story ${storyId} at ${profilesDir}`, {
+        cause: {
+          candidatePaths: storyPaths
+        }
+      })
+    }
+    return storyPaths[0]
+  })
+  .then(loadText)
+  .then(JSON.parse)
+  .then((profileData) => {
+    return new TextProfile(profileData)
+  })
 }

@@ -101,6 +101,18 @@ export const argParser = yargs()
   type: 'boolean',
   description: 'Even if a story is selected, do not generate a profile for it.'
 })
+.option('show-library', {
+  alias: 'L',
+  type: 'string',
+  description: (
+    'Render library (fetched stories, profiles, indexes, etc). Combine with --index, --page, --story opts to only '
+    + 'show a subset of items.\n'
+    + '- txt = render as plain text to the console\n'
+    + '- md = render as a markdown file\n'
+    + '- html = render as a local webpage'
+  ),
+  choices: ['txt', 'md', 'html']
+})
 .alias('v', 'version')
 .alias('h', 'help')
 
@@ -119,7 +131,8 @@ export const argParser = yargs()
  *  page: number,
  *  story: string | undefined,
  *  storyLengthMax: number,
- *  skipProfile: boolean
+ *  skipProfile: boolean,
+ *  showLibrary: string | undefined
  * }>}
  */
 export function loadArgs(argSrc=hideBin(process.argv)) {
