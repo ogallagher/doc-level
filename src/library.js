@@ -19,6 +19,19 @@ let logger
  * @type {string}
  */
 export const TYPE_TO_TAG_CHILD = RelationalTagConnection.TYPE_TO_TAG_CHILD
+/**
+ * Prefix of an ISO timestamp to use for date-value tags.
+ * @type {number}
+ */
+export const TAG_DATE_PRECISION = 'yyyy-mm-dd'.length
+/**
+ * Minimum length of a word within free text to be included in a compressed tag name.
+ */
+export const TAG_TEXT_WORD_LEN_MIN = 4
+/**
+ * Maximum length of a tag name derived from free text.
+ */
+export const TAG_TEXT_LEN_MAX = 16
 
 /**
  * Init module logger and tags for all subclasses of {@link LibraryDescriptor}.
@@ -108,6 +121,41 @@ export async function getLibrary(indexPages, profilesDir) {
 }
 
 /**
+ * @param {Date} date 
+ * @returns Tag derived from date.
+ */
+export function getDateTag(date) {
+  return RelationalTag.get(date.toISOString().substring(0, TAG_DATE_PRECISION))
+}
+
+/**
+ * Convert free text to a compressed tag name.
+ * 
+ * This function will need to be updated to include legible characters in other languages.
+ * 
+ * @param {string} text 
+ */
+export function getTextTag(text) {
+  if (text.length > TAG_TEXT_LEN_MAX) {
+    let tagText = text
+    // lowercase
+    .toLowerCase()
+    // split on illegible chars
+    .split(/[^a-z0-9가-힣áéíóúäëïöüÿç]+/)
+    // drop small words
+    .filter((w) => w.length > TAG_TEXT_WORD_LEN_MIN)
+    // space delimited
+    .join(' ')
+
+    logger.debug('compressed text %s to tag name %s', text, tagText)
+    return RelationalTag.get(tagText)
+  }
+  else {
+    return RelationalTag.get(text)
+  }
+}
+
+/**
  * Unified data structure for browsing indexes, stories/texts, profiles.
  * 
  * All items within the library are organized using [relational tagging](https://github.com/ogallagher/relational_tags).
@@ -152,6 +200,7 @@ export class Library extends LibraryDescriptor {
 
   static initTags() {
     this.adoptTag(LibraryBook.t)
+    this.adoptTag(StoriesIndex.t)
   }
 
   setTags() {
@@ -188,7 +237,8 @@ export class LibraryBook extends LibraryDescriptor {
      * @type {StoriesIndex}
      */
     this.index = getStoriesIndex(indexPage.indexName)
-    // indexes do not have separate instances for each book, so they belong directly to the library
+    // Indexes do not have separate instances for each book, so they belong directly to the library.
+    // TODO To determine books associated with an index, the name should reference the indexPage within a book.
     this.index.setParent(parent)
 
     /**
@@ -199,11 +249,9 @@ export class LibraryBook extends LibraryDescriptor {
   }
 
   static initTags() {
+    this.adoptTag(StorySummary.t)
     // currently, index-page is child of both library-book and stories-index tags.
     this.adoptTag(IndexPage.t)
-
-    this.adoptTag(StoriesIndex.t)
-
     this.adoptTag(TextProfile.t)
   }
 

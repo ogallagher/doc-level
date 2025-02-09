@@ -3,6 +3,7 @@ import { RelationalTag } from 'relational_tags'
 import { LibraryDescriptor } from './libraryDescriptor.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
+import { getTextTag } from './library.js'
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -65,7 +66,7 @@ export class StoriesIndex extends LibraryDescriptor {
   /**
    * 
    * @param {string} urlTemplate 
-   * @param {string[]} name 
+   * @param {string[]} names 
    * @param {number} pageNumberMin 
    * @param {number} pageNumberMax 
    * @param {string} pageFilename
@@ -110,8 +111,12 @@ export class StoriesIndex extends LibraryDescriptor {
      */
     this.storyFileExt = storyFileExt
 
-    names.map((alias) => {
+    // define tags early so that aliases are also defined
+    this.setTags()
+
+    names.forEach((alias) => {
       storiesIndexes.set(alias, this)
+      RelationalTag.alias(StoriesIndex.getNameTag(this.name), alias)
     })
   }
 
@@ -176,9 +181,24 @@ export class StoriesIndex extends LibraryDescriptor {
     this.adoptTag(IndexPage.t)
   }
 
+  /**
+   * Ensures all objects tagged with StoryIndex names follow the same format.
+   * 
+   * @param {string} name 
+   * @returns {RelationalTag}
+   */
+  static getNameTag(name) {
+    return RelationalTag.get(name)
+  }
+
   setTags() {
-    StoriesIndex.tUrlTemplate.connect_to(this.urlTemplate)
-    StoriesIndex.tName.connect_to(this.name)
+    let tuh = RelationalTag.get(this.urlTemplate.hostname)
+    StoriesIndex.tUrlTemplate.connect_to(tuh)
+    tuh.connect_to(this)
+
+    let tn = StoriesIndex.getNameTag(this.name)
+    StoriesIndex.tName.connect_to(tn)
+    tn.connect_to(this)
   }
 }
 

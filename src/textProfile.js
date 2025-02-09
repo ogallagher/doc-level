@@ -35,7 +35,6 @@ export class Maturity extends LibraryDescriptor {
   static t = RelationalTag.new('maturity')
   // maturity types will be added on demand
   static tRestricted = RelationalTag.new('restricted')
-  static tExample = RelationalTag.new('maturity-example')
 
   constructor(isRestricted=undefined, presents=[], absents=[], examples=[]) {
     super()
@@ -72,7 +71,6 @@ export class Maturity extends LibraryDescriptor {
 
   static initTags() {
     this.adoptTag(this.tRestricted)
-    this.adoptTag(this.tExample)
   }
 
   setTags() {
@@ -99,7 +97,11 @@ export class Maturity extends LibraryDescriptor {
       mt.disconnect_to(this)
     }
 
-    // examples are not tagged
+    // examples are not tags
+  }
+
+  toString() {
+    return `${Maturity.name}[restricted=${this.isRestricted} presents=${this.presents.join(',')}]`
   }
 }
 
@@ -110,6 +112,7 @@ export class Difficulty extends LibraryDescriptor {
   static t = RelationalTag.new('difficulty')
   static tYearsOfEducation = RelationalTag.new('years-of-education')
   static tReadingLevel = RelationalTag.new('reading-level')
+  static tDifficultWord = RelationalTag.new('difficult-word')
 
   constructor(yearsOfEducation=0, readingLevelName, reasons=[], difficultWords=[], difficultPhrases=[]) {
     super()
@@ -123,6 +126,9 @@ export class Difficulty extends LibraryDescriptor {
      */
     this.readingLevelName = readingLevelName
     this.reasons = reasons
+    /**
+     * @type {string[]}
+     */
     this.difficultWords = difficultWords
     this.difficultPhrases = difficultPhrases
   }
@@ -134,6 +140,7 @@ export class Difficulty extends LibraryDescriptor {
   static initTags() {
     this.adoptTag(this.tYearsOfEducation)
     this.adoptTag(this.tReadingLevel)
+    this.adoptTag(this.tDifficultWord)
   }
 
   setTags() {
@@ -143,8 +150,23 @@ export class Difficulty extends LibraryDescriptor {
     Difficulty.tReadingLevel.connect_to(tLevel, TYPE_TO_TAG_CHILD)
     tLevel.connect_to(this)
 
-    // reasons are not tagged
-    // difficult words,phrases are not tagged
+    // reasons are tags
+
+    /**
+     * @type {RelationalTag}
+     */
+    let tdw
+    for (let word of this.difficultWords) {
+      tdw = RelationalTag.get(word)
+      Difficulty.tDifficultWord.connect_to(tdw)
+      tdw.connect_to(this)
+    }
+
+    // difficult phrases are not tags
+  }
+
+  toString() {
+    return `${Difficulty.name}[years-of-education=${this.yearsOfEducation} reading-level=${this.readingLevelName}]`
   }
 }
 
@@ -177,7 +199,11 @@ export class Topic extends LibraryDescriptor {
     Topic.adoptTag(tid)
     tid.connect_to(this)
 
-    // example phrases are not tagged
+    // example phrases are not tags
+  }
+
+  toString() {
+    return `${Topic.name}[id=${this.id}]`
   }
 }
 
@@ -219,7 +245,11 @@ export class Ideology extends LibraryDescriptor {
 
     Ideology.tPresence.connect_to(this, undefined, this.presence)
 
-    // example phrases are not tagged
+    // example phrases are not tags
+  }
+
+  toString() {
+    return `${Ideology.name}[id=${this.id}]`
   }
 }
 

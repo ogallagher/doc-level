@@ -1,5 +1,6 @@
 import { RelationalTag } from 'relational_tags'
 import { LibraryDescriptor } from './libraryDescriptor.js'
+import { TYPE_TO_TAG_CHILD, getDateTag, getTextTag } from './library.js'
 
 export class StorySummary extends LibraryDescriptor {
   static t = RelationalTag.new('story')
@@ -10,7 +11,7 @@ export class StorySummary extends LibraryDescriptor {
   /**
    * @param {string} authorName
    * @param {string} title
-   * @param {Date} publishDate
+   * @param {Date|string|number} publishDate
    * @param {number} viewCount
    * @param {string} url
    * @param {string[]} excerpts
@@ -34,7 +35,7 @@ export class StorySummary extends LibraryDescriptor {
     /**
      * @type {Date}
      */
-    this.publishDate = publishDate
+    this.publishDate = new Date(publishDate)
     /**
      * @type {number}
      */
@@ -60,9 +61,20 @@ export class StorySummary extends LibraryDescriptor {
   }
 
   setTags() {
-    StorySummary.t.connect_to(this)
-    StorySummary.tAuthorName.connect_to(this.authorName)
-    StorySummary.tTitle.connect_to(this.title)
-    StorySummary.tPublishDate.connect_to(this.publishDate)
+    let tan = getTextTag(this.authorName)
+    StorySummary.tAuthorName.connect_to(tan, TYPE_TO_TAG_CHILD)
+    tan.connect_to(this)
+
+    let tt = getTextTag(this.title)
+    StorySummary.tTitle.connect_to(tt, TYPE_TO_TAG_CHILD)
+    tt.connect_to(this)
+
+    let tpd = getDateTag(this.publishDate)
+    StorySummary.tPublishDate.connect_to(tpd)
+    tpd.connect_to(this)
+  }
+
+  toString() {
+    return `${StorySummary.name}[id=${this.id} title=${this.title}]`
   }
 }
