@@ -245,12 +245,32 @@ export class Library extends LibraryDescriptor {
   }
 
   /**
-   * Fetch items according to a query to filter and comparator to sort.
+   * Fetch items and their direct tag connections according to a query to filter and comparator to sort.
    * 
-   * @return {Generator<LibraryDescriptor>}
+   * @param {undefined|string|RegExp} query
+   * @param {undefined|function(any, any): number} comparator
+   * 
+   * @return {Generator<[LibraryDescriptor, RelationalTagConnection[]]>}
    */
   *getItems(query, comparator) {
-    
+    /**
+     * Matched items and the tags graph path to each.
+     * @type {Map<LibraryDescriptor, RelationalTagConnection[]>}
+     */
+    let items = RelationalTag._search_descendants(
+      // from root
+      Library.t,
+      // to descendants
+      TYPE_TO_TAG_CHILD,
+      // include entities, exclude tags
+      true, false,
+      query
+    )
+    logger.info('found %s items matching query %s', items.size, query)
+
+    for (let item of items.keys()) {
+      yield [item, [...RelationalTag._tagged_entities.get(item).values()]]
+    }
   }
 
   static initTags() {

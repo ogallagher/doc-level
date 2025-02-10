@@ -70,7 +70,7 @@ export class StorySummary extends LibraryDescriptor {
     tt.connect_to(this)
 
     let tpd = getDateTag(this.publishDate)
-    StorySummary.tPublishDate.connect_to(tpd)
+    StorySummary.tPublishDate.connect_to(tpd, TYPE_TO_TAG_CHILD)
     tpd.connect_to(this)
   }
 

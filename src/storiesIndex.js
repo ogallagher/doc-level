@@ -3,7 +3,7 @@ import { RelationalTag } from 'relational_tags'
 import { LibraryDescriptor } from './libraryDescriptor.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
-import { getTextTag } from './library.js'
+import { getTextTag, TYPE_TO_TAG_CHILD } from './library.js'
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -34,12 +34,14 @@ export function init(parentLogger) {
     )
 
     // create and register indexes
-    new MunjangStoriesIndex()
-    new PaisStoriesIndex('opinion/columnas')
-    new WashingtonPostStoriesIndex('/opinions/columns')
-    new NaverBlogStoriesIndex()
-    new NuevoDiaStoriesIndex('/noticias')
-    new ProjectGutenberg()
+    if (storiesIndexes.size === 0) {
+      new MunjangStoriesIndex()
+      new PaisStoriesIndex('opinion/columnas')
+      new WashingtonPostStoriesIndex('/opinions/columns')
+      new NaverBlogStoriesIndex()
+      new NuevoDiaStoriesIndex('/noticias')
+      new ProjectGutenberg()
+    }
 
     logger.debug('end init')
     res()
@@ -115,7 +117,16 @@ export class StoriesIndex extends LibraryDescriptor {
     this.setTags()
 
     names.forEach((alias) => {
-      storiesIndexes.set(alias, this)
+      if (!storiesIndexes.has(alias)) {
+        storiesIndexes.set(alias, this)
+      }
+      else {
+        logger.warn(
+          'story index alias %s already registered as %o; do not overwrite', 
+          alias, 
+          storiesIndexes.get(alias)
+        )
+      }
       RelationalTag.alias(StoriesIndex.getNameTag(this.name), alias)
     })
   }
@@ -193,11 +204,11 @@ export class StoriesIndex extends LibraryDescriptor {
 
   setTags() {
     let tuh = RelationalTag.get(this.urlTemplate.hostname)
-    StoriesIndex.tUrlTemplate.connect_to(tuh)
+    StoriesIndex.tUrlTemplate.connect_to(tuh, TYPE_TO_TAG_CHILD)
     tuh.connect_to(this)
 
     let tn = StoriesIndex.getNameTag(this.name)
-    StoriesIndex.tName.connect_to(tn)
+    StoriesIndex.tName.connect_to(tn, TYPE_TO_TAG_CHILD)
     tn.connect_to(this)
   }
 }

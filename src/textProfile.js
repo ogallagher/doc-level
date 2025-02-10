@@ -158,7 +158,7 @@ export class Difficulty extends LibraryDescriptor {
     let tdw
     for (let word of this.difficultWords) {
       tdw = RelationalTag.get(word)
-      Difficulty.tDifficultWord.connect_to(tdw)
+      Difficulty.tDifficultWord.connect_to(tdw, TYPE_TO_TAG_CHILD)
       tdw.connect_to(this)
     }
 

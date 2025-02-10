@@ -2,6 +2,7 @@ import { RelationalTag } from 'relational_tags'
 import path from 'node:path'
 import { LibraryDescriptor } from './libraryDescriptor.js'
 import { StoriesIndex } from './storiesIndex.js'
+import { TYPE_TO_TAG_CHILD } from './library.js'
 
 export class IndexPage extends LibraryDescriptor {
   static t = RelationalTag.new('index-page')
@@ -31,17 +32,17 @@ export class IndexPage extends LibraryDescriptor {
 
   setTags() {
     let tin = StoriesIndex.getNameTag(this.indexName)
-    StoriesIndex.tName.connect_to(tin)
+    StoriesIndex.tName.connect_to(tin, TYPE_TO_TAG_CHILD)
     tin.connect_to(this)
     
     IndexPage.tPageNumber.connect_to(this, undefined, this.pageNumber)
 
     let tpd = RelationalTag.get(path.dirname(this.filePath))
-    IndexPage.tPageDir.connect_to(tpd)
+    IndexPage.tPageDir.connect_to(tpd, TYPE_TO_TAG_CHILD)
     tpd.connect_to(this)
 
     let tpf = RelationalTag.get(path.basename(this.filePath))
-    IndexPage.tPageFileName.connect_to(tpf)
+    IndexPage.tPageFileName.connect_to(tpf, TYPE_TO_TAG_CHILD)
     tpf.connect_to(this)
   }
 

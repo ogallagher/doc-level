@@ -162,11 +162,11 @@ describe('storiesIndex', function() {
      */
     let mji
 
-    before(function() {
-      asi = new storiesIndex.StoriesIndex('https://host.tld', ['abstract0'])
-      mji = new storiesIndex.MunjangStoriesIndex()
+    before(async function() {
+      await storiesIndex.init(logger)
 
-      return storiesIndex.init(logger)
+      asi = new storiesIndex.StoriesIndex('https://host.tld', ['abstract0'])
+      mji = storiesIndex.getStoriesIndex('문장웹진')
     })
 
     describe('#getPageUrl', function() {
@@ -287,7 +287,62 @@ describe('library', () => {
     })
   })
 
+  describe('Library', () => {
+    before(() => {
+      [book1, book2].forEach((book) => library.addBook(book))
+    })
+
+    describe('#getItems', () => {
+      it('fetches all items/descriptors without arguments', () => {
+        /**
+         * @type {LibraryDescriptor[]}
+         */
+        let descriptors = []
+
+        for (let [descriptor, tagConnections] of library.getItems()) {
+          logger.debug(
+            descriptor + ': '
+            + tagConnections.map(
+              (entTagConn) => getTagLineageName(entTagConn.target)
+            ).join(', ')
+          )
+
+          descriptors.push(descriptor)
+        }
+
+        assert.strictEqual(
+          // Currently, books are not tagged directly, since their member descriptors
+          // are already tagged.
+          descriptors.filter((d) => d instanceof LibraryBook).length,
+          0,
+          'books should not be tagged directly'
+        )
+        assert.strictEqual(
+          // Similarly, profiles are not tagged directly.
+          descriptors.filter((d) => d instanceof textProfile.TextProfile).length,
+          0,
+          'profiles should not be tagged directly'
+        )
+        assert.strictEqual(
+          descriptors.filter((d) => d instanceof textProfile.Difficulty).length,
+          1,
+          'only 1 book has a profile.difficulty'
+        )
+        assert.strictEqual(
+          descriptors.filter((d) => d instanceof StorySummary).length,
+          2,
+          '2 books in the library each have tagged story summaries'
+        )
+      })
+    })
+  })
+
   describe('LibraryBook', () => {
+    before(() => {
+      logger.info('reset library')
+      library = new Library()
+    })
+
     it('handles unprofiled stories', () => {
       assert.strictEqual(library.books.size, 0)
       library.addBook(book2)
