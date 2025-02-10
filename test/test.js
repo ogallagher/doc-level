@@ -7,7 +7,7 @@ import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
 import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml, reduceStory } from '../src/reader.js'
 import * as storiesIndex from '../src/storiesIndex.js'
-import { Library, LibraryBook, init as libraryInit } from '../src/library.js'
+import { getTagLineageName, Library, LibraryBook, init as libraryInit, TYPE_TO_TAG_CHILD } from '../src/library.js'
 import { IndexPage } from '../src/indexPage.js'
 import { StorySummary } from '../src/storySummary.js'
 import { LibraryDescriptor } from '../src/libraryDescriptor.js'
@@ -255,6 +255,36 @@ describe('library', () => {
 
     book1 = new LibraryBook(library, story1, page1, profile1)
     book2 = new LibraryBook(library, story2, page1, undefined)
+  })
+
+  describe('#getTagLineageName', () => {
+    it('can return a lineage name for any tag', () => {
+      const namespace = 'test-lineage-name'
+
+      let gen0 = RelationalTag.new(`${namespace}-gen0`)
+      assert.strictEqual(getTagLineageName(gen0), gen0.name)
+
+      let gen1 = RelationalTag.new(`${namespace}-gen1`)
+      gen0.connect_to(gen1, TYPE_TO_TAG_CHILD)
+      assert.strictEqual(getTagLineageName(gen1), `${gen0.name}.${gen1.name}`)
+      assert.strictEqual(getTagLineageName(gen0), gen0.name)
+
+      let gen2 = RelationalTag.new(`${namespace}-gen2`)
+      gen1.connect_to(gen2, TYPE_TO_TAG_CHILD)
+
+      let gen3 = RelationalTag.new(`${namespace}-gen3`)
+      gen2.connect_to(gen3, TYPE_TO_TAG_CHILD)
+
+      let gen4 = RelationalTag.new(`${namespace}-gen4`)
+      gen3.connect_to(gen4, TYPE_TO_TAG_CHILD)
+      // lineage exceeds library.TAG_LINEAGE_NAME_PARTS_MAX
+      assert.notStrictEqual(getTagLineageName(gen4).split('.')[0], gen0.name)
+
+      let genOne = RelationalTag.new(`${namespace}-gen-one`)
+      genOne.connect_to(gen0, 'TO_TAG_UNDIRECTED')
+      // genOne has no parent tag
+      assert.strictEqual(getTagLineageName(genOne), genOne.name)
+    })
   })
 
   describe('LibraryBook', () => {

@@ -19,6 +19,7 @@ let logger
  * @type {string}
  */
 export const TYPE_TO_TAG_CHILD = RelationalTagConnection.TYPE_TO_TAG_CHILD
+export const TYPE_TO_TAG_PARENT = RelationalTagConnection.inverse_type(TYPE_TO_TAG_CHILD)
 /**
  * Prefix of an ISO timestamp to use for date-value tags.
  * @type {number}
@@ -32,6 +33,13 @@ export const TAG_TEXT_WORD_LEN_MIN = 4
  * Maximum length of a tag name derived from free text.
  */
 export const TAG_TEXT_LEN_MAX = 16
+/**
+ * Maximum number of generations to include in a lineage tag name.
+ * 
+ * Given tag-tag connections are parent-child relationships, the lineage name for
+ * a child is `parent.child`, here having 2 "generations"/parts.
+ */
+export const TAG_LINEAGE_NAME_PARTS_MAX = 4
 
 /**
  * Init module logger and tags for all subclasses of {@link LibraryDescriptor}.
@@ -67,10 +75,12 @@ export function init(parentLogger) {
 }
 
 /**
-   * 
-   * @param {IndexPage[]} indexPages 
-   * @param {string} profilesDir
-   */
+ * 
+ * @param {IndexPage[]} indexPages 
+ * @param {string} profilesDir
+ * 
+ * @returns {Promise<Library>}
+ */
 export async function getLibrary(indexPages, profilesDir) {
   /**
    * @type {Promise[]}
@@ -156,6 +166,42 @@ export function getTextTag(text) {
 }
 
 /**
+ * @param {RelationalTag} tag 
+ * @returns {RelationalTag|undefined}
+ */
+function getTagParent(tag) {
+  for (let [target, conn] of tag.connections.entries()) {
+    if (target instanceof RelationalTag && conn.type === TYPE_TO_TAG_PARENT) {
+      return target
+    }
+  }
+  return undefined
+}
+
+/**
+ * @param {RelationalTag} tag 
+ * @param {string} delim
+ */
+export function getTagLineageName(tag, delim='.') {
+  /**
+   * Tag lineage, ordered child last.
+   * 
+   * @type {string[]}
+   */
+  let generations = [tag.name]
+  /**
+   * @type {RelationalTag}
+   */
+  let parent = tag
+
+  while (generations.length < TAG_LINEAGE_NAME_PARTS_MAX && (parent = getTagParent(parent)) !== undefined) {
+    generations.splice(0, 0, parent.name)
+  }
+
+  return generations.join(delim)
+}
+
+/**
  * Unified data structure for browsing indexes, stories/texts, profiles.
  * 
  * All items within the library are organized using [relational tagging](https://github.com/ogallagher/relational_tags).
@@ -196,6 +242,15 @@ export class Library extends LibraryDescriptor {
   addBook(book) {
     this.books.set(Library._getKey(book), book)
     book.setTags()
+  }
+
+  /**
+   * Fetch items according to a query to filter and comparator to sort.
+   * 
+   * @return {Generator<LibraryDescriptor>}
+   */
+  *getItems(query, comparator) {
+    
   }
 
   static initTags() {
