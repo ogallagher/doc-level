@@ -41,7 +41,8 @@ export function init(parentLogger) {
  * Write file content to local filesystem.
  * 
  * @param {string} text 
- * @param {string|FileHandle} path
+ * @param {string|FileHandle} path Path to file, or a writable file handle (ex. output of `openFile`). If
+ * file handle, this method assumes the caller will close the file handle on completion.
  * @returns {Promise<undefined>}
  */
 export function writeText(text, path) {
@@ -61,6 +62,7 @@ export function writeText(text, path) {
 }
 
 /**
+ * Open a file file in write mode.
  * 
  * @param {string} path 
  * @returns {Promise<FileHandle>}

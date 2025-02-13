@@ -1,6 +1,7 @@
 package-lock.json
 data
 test/resource_out
+.mermaid.json
 
 # Logs
 logs

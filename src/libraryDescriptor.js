@@ -1,4 +1,4 @@
-import { RelationalTagConnection, SerializableEntity } from 'relational_tags'
+import { RelationalTag, RelationalTagConnection, SerializableEntity } from 'relational_tags'
 
 /**
  * Anything that defines a collection of tags by which library items can be registered/described.
@@ -42,6 +42,15 @@ export class LibraryDescriptor extends SerializableEntity {
    */
   static adoptTag(tag) {
     this.t.connect_to(tag, RelationalTagConnection.TYPE_TO_TAG_CHILD)
+  }
+
+  /**
+   * @param {LibraryDescriptor} descriptor 
+   * 
+   * @returns {RelationalTag}
+   */
+  static getRootTag(descriptor) {
+    return descriptor.constructor.t
   }
 
   /**

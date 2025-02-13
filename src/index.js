@@ -2,6 +2,7 @@
  * doc-level entrypoint.
  */
 
+import { RelationalTag } from 'relational_tags'
 import * as config from './config.js'
 import * as reader from './reader.js'
 import * as tp from './textProfile.js'
@@ -15,6 +16,7 @@ import { fileString } from './stringUtil.js'
 import * as lib from './library.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
+
 /**
  * @typedef {import('./storiesIndex.js').Story} Story
  */
@@ -34,13 +36,18 @@ const logger = pino(
  * @returns {Promise<undefined>}
  */
 function init() {
-  return Promise.all([
+  return new Promise((res) => {
+    // TODO relational-tags log level update is not working
+    RelationalTag.logger.level = 'error'
+    res()
+  })
+  .then(Promise.all([
     tp.init(logger),
     ms.init(logger),
     writer.init(logger),
     si.init(logger),
     lib.init(logger)
-  ])
+  ]))
   // config
   .then(() => {
     return config.init(logger)
@@ -414,7 +421,29 @@ async function main(argSrc) {
       .flat(),
       args.profilesDir
     )
-    console.log(library)
+    
+    // open library render file
+    await writer.initDir(args.rendersDir)
+    let renderFilename = fileString(
+      'library'
+      + (args.tag !== undefined ? `_t=${args.tag}` : '')
+      + (args.query !== undefined ? `_q=${args.query}` : '')
+      + (args.showLibrary === 'tag' ? `_tags.txt` : `.${args.showLibrary}`)
+    )
+    const renderPath = path.join(args.rendersDir, renderFilename)
+    const renderFile = await writer.openFile(renderPath)
+
+    try {
+      for (let chunk of lib.exportLibrary(library, args.showLibrary, args.tag, args.query, args.sort)) {
+        writer.writeText(chunk, renderFile)
+      }
+    }
+    catch (err) {
+      logger.error('library export failed. %s %o', err, err)
+    }
+    
+    renderFile.close()
+    logger.info('view library at %s', renderPath)
   }
 
   if (args.story !== undefined) {

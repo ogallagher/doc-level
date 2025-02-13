@@ -5,6 +5,7 @@ import { StoriesIndex, getStoriesIndex } from './storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
 import { loadText, loadProfile } from './reader.js'
+import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX } from './config.js'
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -181,8 +182,9 @@ function getTagParent(tag) {
 /**
  * @param {RelationalTag} tag 
  * @param {string} delim
+ * @param {string} truncPrefix
  */
-export function getTagLineageName(tag, delim='.') {
+export function getTagLineageName(tag, delim='.', truncPrefix='...') {
   /**
    * Tag lineage, ordered child last.
    * 
@@ -198,7 +200,212 @@ export function getTagLineageName(tag, delim='.') {
     generations.splice(0, 0, parent.name)
   }
 
+  if (generations.length >= TAG_LINEAGE_NAME_PARTS_MAX && getTagParent(parent) !== undefined) {
+    generations.splice(0, 0, truncPrefix)
+  }
+
   return generations.join(delim)
+}
+
+/**
+ * Export/render the given `Library` instance as a content string in the requested format.
+ * 
+ * @param {Library} library 
+ * @param {string} format
+ * @param {string|undefined} startTagName Tag from which to search.
+ * @param {string|RegExp|undefined} query Search query.
+ * @param {string} sort Sort direction. 
+ * 
+ * @returns {Generator<string>}
+ */
+export function *exportLibrary(library, format, startTagName, query, sort) {
+  /**
+   * @type {RelationalTag}
+   */
+  let startTag
+  if (startTagName === undefined) {
+    startTag = Library.t
+  }
+  else {
+    startTag = RelationalTag.get(startTagName, false)
+  }
+
+  if (format === 'tag') {
+    logger.info('render library tags')
+
+    yield 'doc-level all tags\n\n'
+
+    for (
+      let tagLineageName of 
+      [...RelationalTag.all_tags.values()]
+      .map((t) => getTagLineageName(t, ' / '))
+      .toSorted((a, b) => a.localeCompare(b))
+    ) {
+      yield tagLineageName + '\n'
+    }
+
+    yield '\n'
+  }
+  else if (format === 'txt') {
+    logger.info('render library as a list books')
+
+    const bookGen = library.getBooks(startTag, query, sort)
+    /**
+     * @type {LibraryBook}
+     */
+    let book
+    /**
+     * @type {RelationalTagConnection[]}
+     */
+    let bookSearchPath
+
+    yield `=== books in library for start-tag=${startTagName} query=${query} sort=${sort}\n\n`
+    for (
+      let next = bookGen.next(); 
+      !next.done && ([book, bookSearchPath] = next.value);
+      next = bookGen.next()
+    ) {
+      yield `- title=${book.story.title} \n`
+      yield `  author=${book.story.authorName} \n`
+      yield `  id=${book.story.id}\n`
+
+      yield `  index=${book.index} index-page=${book.indexPage.pageNumber} \n`
+
+      if (book.profile !== undefined) {
+        yield `  reading-level=${book.profile.difficulty?.readingLevelName} `
+          + `years-of-education=${book.profile.difficulty?.yearsOfEducation}\n`
+
+        yield `  restricted=${book.profile.maturity?.isRestricted} `
+        + (book.profile.maturity?.presents.join(' ')) + '\n'
+
+        yield `  topics=` + book.profile.topics.map((topic) => topic.id).join(' ') + '\n'
+
+        yield `  ideologies=` 
+        + (
+          book.profile.ideologies
+          .filter((ideology) => ideology.presence > 0.5)
+          .map((ideology) => `${ideology.id}[${ideology.presence}]`)
+          .join(' ')
+        ) + '\n'
+      }
+      else {
+        yield `  <not yet profiled>\n`
+      }
+
+      yield '  search-path='
+      yield bookSearchPath.map((conn) => {
+        // path to book only includes connections to tags
+        return (conn.weight !== null ? `[${conn.weight}]` : '') + conn.target.name
+      }).join('.')
+
+      yield '\n\n'
+    }
+    yield `===\n`
+  }
+  else if (format === 'md') {
+    logger.info('render library as markdown with embedded mermaid')
+
+    // header
+    yield '# doc-level library export\n\n'
+    // begin mermaid diagram
+    yield '```mermaid\n'
+    yield '\nflowchart LR\n'
+    // tags graph, showing all parent-->child connections
+    /**
+     * @type {Map<LibraryDescriptor, string>}
+     */
+    const descriptors = new Map()
+    /**
+     * @type {Map<RelationalTag, string>}
+     */
+    const tags = new Map()
+
+    for (
+      let tag of 
+      [...RelationalTag.all_tags.values()]
+      .filter((t) => {
+        let tline = getTagLineageName(t)
+        return (
+          tline.indexOf('difficulty.reading-level') !== -1
+          // || tline.indexOf('difficulty.years-of-education') !== -1
+        )
+      })
+    ) {
+      /**
+       * @type {string}
+       */
+      let tagId 
+      if (tags.has(tag)) {
+        tagId = tags.get(tag)
+      }
+      else {
+        // define tag
+        tagId = `tag-${tags.size}`
+        tags.set(tag, tagId)
+        yield `${tagId}("${tag.name}")\n`
+      }
+
+      for (let conn of tag.connections.values()) {
+        const edgeLabel = (
+          conn.weight !== null ? `|"${conn.weight}"|` : ''
+        )
+
+        if (conn.target instanceof RelationalTag) {
+          // tag--tag
+          if (conn.type === TYPE_TO_TAG_CHILD) {
+            /**
+             * @type {string}
+             */
+            let childId
+            if (tags.has(conn.target)) {
+              childId = tags.get(conn.target)
+            }
+            else {
+              // define tag
+              childId = `tag-${tags.size}`
+              tags.set(conn.target, childId)
+              yield `${childId}("${conn.target.name}")\n`
+            }
+
+            yield `${tagId} -->${edgeLabel} ${childId}\n`
+          }
+          else {
+            logger.debug(`skip edge for ${conn}`)
+          }
+        }
+        else if (conn.target instanceof LibraryDescriptor) {
+          // tag--LibraryDescriptor
+          let dId
+
+          if (!descriptors.has(conn.target)) {
+            // define descriptor
+            dId = `descriptor-${descriptors.size}`
+            descriptors.set(conn.target, dId)
+            yield `${dId}["${conn.target.toString()}"]\n`
+          }
+          else {
+            dId = descriptors.get(conn.target)
+          }
+          
+          // connect to descriptor
+          yield `${tagId} -->${edgeLabel} ${dId}\n`
+        }
+        else {
+          // tag--<unknown>
+          yield `%% ERROR cannot graph connection to entity ${conn.target}\n`
+        }
+      }
+    }
+
+    // end mermaid diagram
+    yield '```\n'
+  }
+  else if (format === 'html') {
+    logger.info('render library as a local webpage')
+  }
+  else {
+    throw new Error(`unsupported library export format=${format}`)
+  }
 }
 
 /**
@@ -245,31 +452,159 @@ export class Library extends LibraryDescriptor {
   }
 
   /**
-   * Fetch items and their direct tag connections according to a query to filter and comparator to sort.
    * 
-   * @param {undefined|string|RegExp} query
-   * @param {undefined|function(any, any): number} comparator
-   * 
-   * @return {Generator<[LibraryDescriptor, RelationalTagConnection[]]>}
+   * @param {Map<RelationalTag|LibraryDescriptor, RelationalTagConnection[]>} items 
+   * @param {string} sort
    */
-  *getItems(query, comparator) {
+  static sortSearchItems(items, sort) {
+    return [...items.entries()]
+    .toSorted(([a, aConns], [b, bConns]) => {
+      let ci = 0
+      /**
+       * @type {number}
+       */
+      let cmp = 0
+      /**
+       * @type {RelationalTagConnection}
+       */
+      let ac
+      /**
+       * @type {RelationalTagConnection}
+       */
+      let bc
+      while (cmp === 0 && ci < aConns.length && ci < bConns.length) {
+        ac = aConns[ci]
+        bc = bConns[ci]
+
+        if (ac.weight !== null && bc.weight !== null) {
+          // sort by connection weight
+          cmp = ac.weight - bc.weight
+        }
+        else {
+          if (ac.target instanceof RelationalTag && bc.target instanceof RelationalTag) {
+            // sort by target tag name
+            cmp = ac.target.name.localeCompare(bc.target.name)
+          }
+          else {
+            // sort by target string representation
+            cmp = ac.target.toString().localeCompare(bc.target.toString())
+          }
+        }
+
+        ci ++
+      }
+
+      if (cmp === 0) {
+        // sort by path length (short first)
+        cmp = aConns.length - bConns.length
+      }
+
+      if (cmp === 0) {
+        if (a instanceof RelationalTag && b instanceof RelationalTag) {
+          // sort by result name
+          cmp = a.name.localeCompare(b.name)
+        }
+        else {
+          // sort by result string representation
+          cmp = a.toString().localeCompare(b.toString())
+        }
+      }
+
+      return cmp * (sort === 'asc' ? 1 : -1)
+    })
+  }
+
+  /**
+   * Fetch books according to a search query.
+   * 
+   * @param {RelationalTag} startTag Tag from which to search.
+   * @param {string|RegExp|undefined} query Search query.
+   * @param {string} sort Sort direction. 
+   * 
+   * @return {Generator<[LibraryBook, RelationalTagConnection[]]>}
+   */
+  *getBooks(startTag, query, sort) {
     /**
      * Matched items and the tags graph path to each.
-     * @type {Map<LibraryDescriptor, RelationalTagConnection[]>}
+     * @type {Map<RelationalTag, RelationalTagConnection[]>}
      */
-    let items = RelationalTag._search_descendants(
-      // from root
-      Library.t,
-      // to descendants
-      TYPE_TO_TAG_CHILD,
-      // include entities, exclude tags
-      true, false,
-      query
-    )
-    logger.info('found %s items matching query %s', items.size, query)
+    let resultTags
+    
+    if (query === undefined ) {
+      resultTags = new Map([[startTag, []]])
+    }
+    else {
+      resultTags = RelationalTag._search_descendants(
+        // from root
+        startTag,
+        // to descendants
+        TYPE_TO_TAG_CHILD,
+        // exclude entities, include tags
+        false, true,
+        query
+      )
+      logger.info('under parent %s found %s tags matching query %s', startTag.name, resultTags.size, query)
+      if (resultTags.size === 0) {
+        logger.error('no tags found under parent tag %s matching query %s', startTag.name, query)
+        return
+      }
+    }
 
-    for (let item of items.keys()) {
-      yield [item, [...RelationalTag._tagged_entities.get(item).values()]]
+    // sort result tags
+    let sortedTags = Library.sortSearchItems(resultTags, sort)
+    logger.debug('sorted tags %s with first=%s', sort, sortedTags[0])
+
+    // convert tags to books
+    /**
+     * Each tagged descriptor and its path from a result tag.
+     * 
+     * @type {Set<LibraryDescriptor>}
+     */
+    let resultDescriptors = new Set()
+    // TODO books are repeated in result
+    let t = 0
+    for (let [startTag, pathToStartTag] of sortedTags) {
+      if (t < SEARCH_TAGS_MAX) {
+        /**
+         * @type {Map<LibraryDescriptor, RelationalTagConnection[]>}
+         */
+        let descriptors = RelationalTag._search_descendants(
+          startTag, 
+          TYPE_TO_TAG_CHILD,
+          // include entities, exclude tags
+          true, false,
+          // no query
+          undefined,
+          // prevent duplicates in result
+          new Set(resultDescriptors)
+        )
+
+        // sort result descriptors
+        let sortedDescriptors = Library.sortSearchItems(descriptors, sort)
+
+        let b = 0
+        for (let [descriptor, pathToDescriptor] of sortedDescriptors) {
+          if (b < SEARCH_TAG_BOOKS_MAX) {
+            resultDescriptors.add(descriptor)
+            yield [
+              LibraryBook.getBook(descriptor)[0],
+              pathToStartTag.filter((conn) => conn.target !== startTag)
+              .concat(pathToDescriptor)
+              .filter((conn) => conn.target instanceof RelationalTag)
+            ]
+          }
+          else {
+            logger.info('reached books maximum %s for result tag %s', b, startTag.name)
+            break
+          }
+          b++
+        }
+      }
+      else {
+        logger.info('reached result tags maximum %s', t)
+        break
+      }
+      t++
     }
   }
 
@@ -321,6 +656,26 @@ export class LibraryBook extends LibraryDescriptor {
      */
     this.profile = profile
     this.profile?.setParent(this)
+  }
+
+  /**
+   * @param {LibraryDescriptor} descriptor
+   * @returns {[LibraryBook|undefined, LibraryDescriptor[]]} The ancestor book to which a descriptor belongs.
+   */
+  static getBook(descriptor) {
+    let parent = descriptor
+    let path = [descriptor]
+    while (!(parent instanceof LibraryBook)) {
+      parent = parent.parent
+      if (parent === undefined) {
+        break
+      }
+      else {
+        path.push(parent)
+      }
+    }
+
+    return [parent, path]
   }
 
   static initTags() {

@@ -300,10 +300,17 @@ describe('library', () => {
         let descriptors = []
 
         for (let [descriptor, tagConnections] of library.getItems()) {
-          logger.debug(
+          logger.info(
             descriptor + ': '
             + tagConnections.map(
-              (entTagConn) => getTagLineageName(entTagConn.target)
+              (entTagConn) => {
+                let str = getTagLineageName(entTagConn.target)
+                if (entTagConn.weight !== null) {
+                  str += '=' + entTagConn.weight
+                }
+
+                return str
+              }
             ).join(', ')
           )
 

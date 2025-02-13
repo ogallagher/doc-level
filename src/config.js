@@ -33,6 +33,8 @@ export const TOPICS_MAX = 6
 export const TOPIC_EXAMPLES_MAX = 10
 export const IDEOLOGIES_MAX = 6
 export const IDEOLOGY_EXAMPLES_MAX = 10
+export const SEARCH_TAGS_MAX = 10
+export const SEARCH_TAG_BOOKS_MAX = 50
 
 /**
  * @type {Logger}
@@ -105,13 +107,44 @@ export const argParser = yargs()
   alias: 'L',
   type: 'string',
   description: (
-    'Render library (fetched stories, profiles, indexes, etc). Combine with --index, --page, --story opts to only '
+    'Show library (fetched stories, profiles, indexes, etc). Combine with other opts to only '
     + 'show a subset of items.\n'
-    + '- txt = render as plain text to the console\n'
-    + '- md = render as a markdown file\n'
-    + '- html = render as a local webpage'
+    + '- tag = Print flat list of all available tags for searching. Filters are not applied.\n'
+    + '- txt = Print flat list of books to a plain text file.\n'
+    + '- md = [pending] Render as a markdown file.\n'
+    + '- html = [pending] Render as a local webpage.'
   ),
-  choices: ['txt', 'md', 'html']
+  choices: ['tag', 'txt', 'md', 'html']
+})
+.option('tag', {
+  alias: 't',
+  type: 'string',
+  description: 'Tag name for limiting library items.'
+})
+.option('query', {
+  alias: 'q',
+  type: 'string',
+  description: (
+    'Query string for limiting library items by tag pattern. '
+    + 'Surround with slashes like /\\w+e/ to search using a regular expression. Note that currently '
+    + 'the regexp must match the whole tag name, not a substring.'
+  )
+})
+.option('sort', {
+  alias: '>',
+  type: 'string',
+  choices: ['asc', 'desc'],
+  default: 'asc',
+  description: (
+    'Sort direction of search results. \n'
+    + 'Ex. "-t years-of-education -> asc" will sort easiest texts first.'
+  )
+})
+.option('renders-dir', {
+  alias: 'e',
+  type: 'string',
+  description: 'Local directory where library renderings/exports are saved.',
+  default: path.join('data', 'renders')
 })
 .alias('v', 'version')
 .alias('h', 'help')
@@ -132,7 +165,11 @@ export const argParser = yargs()
  *  story: string | undefined,
  *  storyLengthMax: number,
  *  skipProfile: boolean,
- *  showLibrary: string | undefined
+ *  showLibrary: string | undefined,
+ *  rendersDir: string,
+ *  tag: string | undefined,
+ *  query: string | RegExp | undefined,
+ *  sort: string
  * }>}
  */
 export function loadArgs(argSrc=hideBin(process.argv)) {
@@ -140,6 +177,13 @@ export function loadArgs(argSrc=hideBin(process.argv)) {
     logger.debug('load runtime args')
 
     const argv = argParser.parse(argSrc)
+
+    // query
+    if (argv.query !== undefined && argv.query.startsWith('/') && argv.query.endsWith('/')) {
+      const query_regexp = new RegExp(argv.query.substring(1, argv.query.length-1))
+      logger.debug('converted raw query %s to regexp %s', argv.query, query_regexp)
+      argv.query = query_regexp
+    }
   
     logger.info('loaded runtime args')
     res(argv)
