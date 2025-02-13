@@ -561,7 +561,12 @@ export class Library extends LibraryDescriptor {
      * @type {Set<LibraryDescriptor>}
      */
     let resultDescriptors = new Set()
-    // TODO books are repeated in result
+    /**
+     * Return each book only once, since multiple result descriptors can belong to the same book.
+     * 
+     * @type {Set<LibraryBook>}
+     */
+    let resultBooks = new Set()
     let t = 0
     for (let [startTag, pathToStartTag] of sortedTags) {
       if (t < SEARCH_TAGS_MAX) {
@@ -586,12 +591,19 @@ export class Library extends LibraryDescriptor {
         for (let [descriptor, pathToDescriptor] of sortedDescriptors) {
           if (b < SEARCH_TAG_BOOKS_MAX) {
             resultDescriptors.add(descriptor)
-            yield [
-              LibraryBook.getBook(descriptor)[0],
-              pathToStartTag.filter((conn) => conn.target !== startTag)
-              .concat(pathToDescriptor)
-              .filter((conn) => conn.target instanceof RelationalTag)
-            ]
+            const book = LibraryBook.getBook(descriptor)[0]
+            
+            // some descriptors do not belong to books (ex StoriesIndex)
+            if (book !== undefined && !resultBooks.has(book)) {
+              resultBooks.add(book)
+              
+              yield [
+                book,
+                pathToStartTag.filter((conn) => conn.target !== startTag)
+                .concat(pathToDescriptor)
+                .filter((conn) => conn.target instanceof RelationalTag)
+              ]
+            }
           }
           else {
             logger.info('reached books maximum %s for result tag %s', b, startTag.name)

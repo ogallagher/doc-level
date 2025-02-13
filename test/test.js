@@ -292,16 +292,16 @@ describe('library', () => {
       [book1, book2].forEach((book) => library.addBook(book))
     })
 
-    describe('#getItems', () => {
-      it('fetches all items/descriptors without arguments', () => {
+    describe('#getBooks', () => {
+      it('fetches all books without query', () => {
         /**
-         * @type {LibraryDescriptor[]}
+         * @type {LibraryBook[]}
          */
-        let descriptors = []
+        let books = []
 
-        for (let [descriptor, tagConnections] of library.getItems()) {
+        for (let [book, tagConnections] of library.getBooks(Library.t)) {
           logger.info(
-            descriptor + ': '
+            book + ': '
             + tagConnections.map(
               (entTagConn) => {
                 let str = getTagLineageName(entTagConn.target)
@@ -314,31 +314,20 @@ describe('library', () => {
             ).join(', ')
           )
 
-          descriptors.push(descriptor)
+          books.push(book)
         }
 
         assert.strictEqual(
           // Currently, books are not tagged directly, since their member descriptors
           // are already tagged.
-          descriptors.filter((d) => d instanceof LibraryBook).length,
-          0,
-          'books should not be tagged directly'
+          books.filter((d) => d instanceof LibraryBook).length,
+          books.length,
+          'all return values should be instances of Library Book'
         )
         assert.strictEqual(
-          // Similarly, profiles are not tagged directly.
-          descriptors.filter((d) => d instanceof textProfile.TextProfile).length,
-          0,
-          'profiles should not be tagged directly'
-        )
-        assert.strictEqual(
-          descriptors.filter((d) => d instanceof textProfile.Difficulty).length,
+          books.filter((book) => book.profile?.difficulty !== undefined).length,
           1,
           'only 1 book has a profile.difficulty'
-        )
-        assert.strictEqual(
-          descriptors.filter((d) => d instanceof StorySummary).length,
-          2,
-          '2 books in the library each have tagged story summaries'
         )
       })
     })
