@@ -3,7 +3,7 @@ import { RelationalTag } from 'relational_tags'
 import { LibraryDescriptor } from './libraryDescriptor.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
-import { getTextTag, TYPE_TO_TAG_CHILD } from './library.js'
+import { TYPE_TO_TAG_CHILD } from './library.js'
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -61,8 +61,16 @@ export function getStoriesIndex(name) {
 }
 
 export class StoriesIndex extends LibraryDescriptor {
-  static tUrlTemplate = RelationalTag.new('url-template')
-  static tName = RelationalTag.new('index-name')
+  // static defined on class declaration to satisfy circular dependency with IndexPage
+  // and early setTags in constructor
+  /**
+   * @type {RelationalTag}
+   */
+  static get tUrlTemplate() { return RelationalTag.new('url-template') }
+  /**
+   * @type {RelationalTag}
+   */
+  static get tName() { return RelationalTag.new('index-name') }
 
   /**
    * 

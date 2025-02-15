@@ -36,7 +36,7 @@ export class Maturity extends LibraryDescriptor {
   /**
    * @type {RelationalTag}
    */
-  static tRestricted
+  static get tRestricted() { return RelationalTag.new('restricted') }
 
   constructor(isRestricted=undefined, presents=[], absents=[], examples=[]) {
     super()
@@ -72,7 +72,6 @@ export class Maturity extends LibraryDescriptor {
   }
 
   static initTags() {
-    this.tRestricted = RelationalTag.new('restricted')
     this.adoptTag(this.tRestricted)
   }
 
@@ -223,7 +222,7 @@ export class Ideology extends LibraryDescriptor {
   /**
    * @type {RelationalTag}
    */
-  static tPresence
+  static get tPresence() { return RelationalTag.new('presence') }
 
   constructor(id, presence, examplePhrases=[]) {
     super()
@@ -249,7 +248,6 @@ export class Ideology extends LibraryDescriptor {
   }
 
   static initTags() {
-    this.tPresence = RelationalTag.new('presence')
     this.adoptTag(this.tPresence)
   }
 
@@ -269,7 +267,7 @@ export class Ideology extends LibraryDescriptor {
 }
 
 export class TextProfile extends LibraryDescriptor {
-  static tFilePath
+  static get tFilePath() { return RelationalTag.new('file-path') }
 
   /**
    * @param {{
@@ -335,7 +333,6 @@ export class TextProfile extends LibraryDescriptor {
   }
 
   static initTags() {
-    this.tFilePath = RelationalTag.new('file-path')
     this.adoptTag(this.tFilePath)
     this.adoptTag(Maturity.t)
     this.adoptTag(Difficulty.t)

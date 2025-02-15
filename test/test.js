@@ -19,6 +19,8 @@ const logger = pino(
   }
 )
 
+await libraryInit(logger)
+
 describe('textProfile', function() {
   describe('#init', function() {
     it('passes with parent logger', function() {
@@ -240,7 +242,6 @@ describe('library', () => {
   let book2
 
   before(async () => {
-    await libraryInit(logger)
     library = new Library()
 
     let index1 = new storiesIndex.StoriesIndex('https://host.tld', ['index1', 'i1'])

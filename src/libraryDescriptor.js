@@ -6,11 +6,22 @@ import { RelationalTag, RelationalTagConnection, SerializableEntity } from 'rela
  * Instances themselves become tagged entities in the library.
  */
 export class LibraryDescriptor extends SerializableEntity {
+  static _t
+
   /**
    * Root tag for this descriptor.
    * @type {RelationalTag}
    */
-  static t
+  static get t() {
+    return this._t
+  }
+
+  /**
+   * @param {RelationalTag} val
+   */
+  static set t(val) {
+    this._t = val
+  }
   
   /**
    * 
