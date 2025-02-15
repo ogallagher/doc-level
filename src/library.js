@@ -71,7 +71,7 @@ export function init(parentLogger) {
     Library.initTags()
 
     logger.debug('end init')
-    res()
+    res(logger)
   })
 }
 
@@ -246,9 +246,8 @@ export function *exportLibrary(library, format, startTagName, query, sort) {
 
     yield '\n'
   }
-  else if (format === 'txt') {
-    logger.info('render library as a list books')
-
+  else {
+    // TODO why is last pathToBook edge recursive?
     const bookGen = library.getBooks(startTag, query, sort)
     /**
      * @type {LibraryBook}
@@ -259,152 +258,227 @@ export function *exportLibrary(library, format, startTagName, query, sort) {
      */
     let bookSearchPath
 
-    yield `=== books in library for start-tag=${startTagName} query=${query} sort=${sort}\n\n`
-    for (
-      let next = bookGen.next(); 
-      !next.done && ([book, bookSearchPath] = next.value);
-      next = bookGen.next()
-    ) {
-      yield `- title=${book.story.title} \n`
-      yield `  author=${book.story.authorName} \n`
-      yield `  id=${book.story.id}\n`
-
-      yield `  index=${book.index} index-page=${book.indexPage.pageNumber} \n`
-
-      if (book.profile !== undefined) {
-        yield `  reading-level=${book.profile.difficulty?.readingLevelName} `
-          + `years-of-education=${book.profile.difficulty?.yearsOfEducation}\n`
-
-        yield `  restricted=${book.profile.maturity?.isRestricted} `
-        + (book.profile.maturity?.presents.join(' ')) + '\n'
-
-        yield `  topics=` + book.profile.topics.map((topic) => topic.id).join(' ') + '\n'
-
-        yield `  ideologies=` 
-        + (
-          book.profile.ideologies
-          .filter((ideology) => ideology.presence > 0.5)
-          .map((ideology) => `${ideology.id}[${ideology.presence}]`)
-          .join(' ')
-        ) + '\n'
-      }
-      else {
-        yield `  <not yet profiled>\n`
-      }
-
-      yield '  search-path='
-      yield bookSearchPath.map((conn) => {
-        // path to book only includes connections to tags
-        return (conn.weight !== null ? `[${conn.weight}]` : '') + conn.target.name
-      }).join('.')
-
-      yield '\n\n'
-    }
-    yield `===\n`
-  }
-  else if (format === 'md') {
-    logger.info('render library as markdown with embedded mermaid')
-
-    // header
-    yield '# doc-level library export\n\n'
-    // begin mermaid diagram
-    yield '```mermaid\n'
-    yield '\nflowchart LR\n'
-    // tags graph, showing all parent-->child connections
-    /**
-     * @type {Map<LibraryDescriptor, string>}
-     */
-    const descriptors = new Map()
-    /**
-     * @type {Map<RelationalTag, string>}
-     */
-    const tags = new Map()
-
-    for (
-      let tag of 
-      [...RelationalTag.all_tags.values()]
-      .filter((t) => {
-        let tline = getTagLineageName(t)
-        return (
-          tline.indexOf('difficulty.reading-level') !== -1
-          // || tline.indexOf('difficulty.years-of-education') !== -1
-        )
-      })
-    ) {
-      /**
-       * @type {string}
-       */
-      let tagId 
-      if (tags.has(tag)) {
-        tagId = tags.get(tag)
-      }
-      else {
-        // define tag
-        tagId = `tag-${tags.size}`
-        tags.set(tag, tagId)
-        yield `${tagId}("${tag.name}")\n`
-      }
-
-      for (let conn of tag.connections.values()) {
-        const edgeLabel = (
-          conn.weight !== null ? `|"${conn.weight}"|` : ''
-        )
-
-        if (conn.target instanceof RelationalTag) {
-          // tag--tag
-          if (conn.type === TYPE_TO_TAG_CHILD) {
-            /**
-             * @type {string}
-             */
-            let childId
-            if (tags.has(conn.target)) {
-              childId = tags.get(conn.target)
-            }
-            else {
-              // define tag
-              childId = `tag-${tags.size}`
-              tags.set(conn.target, childId)
-              yield `${childId}("${conn.target.name}")\n`
-            }
-
-            yield `${tagId} -->${edgeLabel} ${childId}\n`
-          }
-          else {
-            logger.debug(`skip edge for ${conn}`)
-          }
-        }
-        else if (conn.target instanceof LibraryDescriptor) {
-          // tag--LibraryDescriptor
-          let dId
-
-          if (!descriptors.has(conn.target)) {
-            // define descriptor
-            dId = `descriptor-${descriptors.size}`
-            descriptors.set(conn.target, dId)
-            yield `${dId}["${conn.target.toString()}"]\n`
-          }
-          else {
-            dId = descriptors.get(conn.target)
-          }
-          
-          // connect to descriptor
-          yield `${tagId} -->${edgeLabel} ${dId}\n`
+    if (format === 'txt') {
+      logger.info('render library as a list books')
+  
+      yield `=== books in library for start-tag=${startTagName} query=${query} sort=${sort}\n\n`
+      for (
+        let next = bookGen.next(); 
+        !next.done && ([book, bookSearchPath] = next.value);
+        next = bookGen.next()
+      ) {
+        yield `- title=${book.story.title} \n`
+        yield `  author=${book.story.authorName} \n`
+        yield `  id=${book.story.id}\n`
+  
+        yield `  index=${book.index} index-page=${book.indexPage.pageNumber} \n`
+  
+        if (book.profile !== undefined) {
+          yield `  reading-level=${book.profile.difficulty?.readingLevelName} `
+            + `years-of-education=${book.profile.difficulty?.yearsOfEducation}\n`
+  
+          yield `  restricted=${book.profile.maturity?.isRestricted} `
+          + (book.profile.maturity?.presents.join(' ')) + '\n'
+  
+          yield `  topics=` + book.profile.topics.map((topic) => topic.id).join(' ') + '\n'
+  
+          yield `  ideologies=` 
+          + (
+            book.profile.ideologies
+            .filter((ideology) => ideology.presence > 0.5)
+            .map((ideology) => `${ideology.id}[${ideology.presence}]`)
+            .join(' ')
+          ) + '\n'
         }
         else {
-          // tag--<unknown>
-          yield `%% ERROR cannot graph connection to entity ${conn.target}\n`
+          yield `  <not yet profiled>\n`
+        }
+  
+        yield '  search-path='
+        yield bookSearchPath.map((conn) => {
+          // path to book only includes connections to tags
+          return (conn.weight !== null ? `[${conn.weight}]` : '') + conn.target.name
+        }).join('.')
+  
+        yield '\n\n'
+      }
+      yield `===\n`
+    }
+    else if (format === 'md') {
+      logger.info('render library books as markdown with embedded mermaid')
+  
+      // header
+      yield '# doc-level library export\n\n'
+
+      // save input
+      yield `## input\n\n`
+      yield `\`--show-library ${format} --tag ${startTagName} --query ${query} --sort ${sort}\`\n`
+      yield '\n'
+
+      yield `## output\n\n`
+
+      // begin mermaid diagram
+      yield '```mermaid\n'
+      yield '\nflowchart LR\n'
+
+      // define book style
+      yield `classDef book text-align:left;\n`
+      // define tag style
+      yield `classDef tag text-align:center;\n`
+      
+      /**
+       * @type {Map<LibraryDescriptor|RelationalTag, string>}
+       */
+      const nodes = new Map()
+      /**
+       * @type {Set<RelationalTagConnection>}
+       */
+      const edges = new Set()
+
+      for (
+        let next = bookGen.next(); 
+        !next.done && ([book, bookSearchPath] = next.value);
+        next = bookGen.next()
+      ) {
+        /**
+         * @type {string}
+         */
+        let bookId
+        // current implementation of Library.getBooks should not return duplicate books,
+        // but here we do not rely on that assumption.
+        if (nodes.has(book)) {
+          bookId = book
+        }
+        else {
+          // define book
+          bookId = `book-${nodes.size}`
+          nodes.set(book, bookId)
+          yield `${bookId}["`
+          yield `title=${book.story.title}\n`
+          yield `author=${book.story.authorName}\n`
+          yield `id=${book.story.id}\n`
+          yield `index=${book.index} index-page=${book.indexPage.pageNumber} \n`
+  
+          if (book.profile !== undefined) {
+            yield `reading-level=${book.profile.difficulty?.readingLevelName} `
+            + `years-of-education=${book.profile.difficulty?.yearsOfEducation}\n`
+    
+            yield `restricted=${book.profile.maturity?.isRestricted} `
+            + (book.profile.maturity?.presents.join(' ')) + '\n'
+    
+            yield `topics=` + book.profile.topics.map((topic) => topic.id).join(' ') + '\n'
+    
+            yield `ideologies=` 
+            + (
+              book.profile.ideologies
+              .filter((ideology) => ideology.presence > 0.5)
+              .map((ideology) => `${ideology.id}[${ideology.presence}]`)
+              .join(' ')
+            ) + '\n'
+          }
+          else {
+            yield `profile=none\n`
+          }
+          yield `"]:::book\n`
+        }
+
+        for (let conn of bookSearchPath) {
+          // skip connection if edge already created
+          if (edges.has(conn)) {
+            continue
+          }
+          else {
+            edges.add(conn)
+          }
+
+          /**
+           * @type {RelationalTag}
+           */
+          let tag = conn.source
+          /**
+           * @type {string}
+           */
+          let tagId 
+          if (nodes.has(tag)) {
+            tagId = nodes.get(tag)
+          }
+          else {
+            // define tag
+            tagId = `tag-${nodes.size}`
+            nodes.set(tag, tagId)
+            yield `${tagId}(["${tag.name}"]):::tag\n`
+          }
+
+          // create edge if not recursive
+          if (conn.source !== conn.target) {
+            const edgeLabel = (
+              conn.weight !== null ? `|"${conn.weight}"|` : ''
+            )
+            
+            if (conn.target instanceof RelationalTag) {
+              // tag--tag
+              if (conn.type === TYPE_TO_TAG_CHILD) {
+                /**
+                 * @type {string}
+                 */
+                let childId
+                if (nodes.has(conn.target)) {
+                  childId = nodes.get(conn.target)
+                }
+                else {
+                  // define tag
+                  childId = `tag-${nodes.size}`
+                  nodes.set(conn.target, childId)
+                  yield `${childId}(["${conn.target.name}"]):::tag\n`
+                }
+    
+                yield `${tagId} -->${edgeLabel} ${childId}\n`
+              }
+              else {
+                yield `%% skip edge for ${conn}`
+              }
+            }
+            // currently, bookSearchPath should only edges between tags, so this is not used
+            else if (conn.target instanceof LibraryDescriptor) {
+              // tag--LibraryDescriptor
+              let dId
+    
+              if (!nodes.has(conn.target)) {
+                // define descriptor
+                dId = `descriptor-${nodes.size}`
+                nodes.set(conn.target, dId)
+                yield `${dId}["${conn.target.toString()}"]\n`
+              }
+              else {
+                dId = nodes.get(conn.target)
+              }
+              
+              // connect to descriptor
+              yield `${tagId} -->${edgeLabel} ${dId}\n`
+            }
+            else {
+              // tag--<unknown>
+              yield `%% ERROR cannot graph connection to entity ${conn.target}\n`
+            }
+          }
+        }
+
+        // create edge from last tag in search path to book
+        const lastConn = bookSearchPath[bookSearchPath.length-1]
+        if (lastConn.target !== book) {
+          yield `${nodes.get(lastConn.target)} --> ${bookId}\n`
         }
       }
+  
+      // end mermaid diagram
+      yield '```\n'
     }
-
-    // end mermaid diagram
-    yield '```\n'
-  }
-  else if (format === 'html') {
-    logger.info('render library as a local webpage')
-  }
-  else {
-    throw new Error(`unsupported library export format=${format}`)
+    else if (format === 'html') {
+      logger.info('render library as a local webpage')
+    }
+    else {
+      throw new Error(`unsupported library export format=${format}`)
+    }
   }
 }
 
@@ -599,8 +673,11 @@ export class Library extends LibraryDescriptor {
               
               yield [
                 book,
-                pathToStartTag.filter((conn) => conn.target !== startTag)
-                .concat(pathToDescriptor)
+                pathToStartTag
+                .concat(
+                  // remove initial recursive connection when linking to end first path
+                  pathToDescriptor.filter((conn) => conn.source !== conn.target)
+                )
                 .filter((conn) => conn.target instanceof RelationalTag)
               ]
             }
