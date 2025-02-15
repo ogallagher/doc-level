@@ -255,9 +255,11 @@ export class Ideology extends LibraryDescriptor {
 
 export class TextProfile extends LibraryDescriptor {
   static t = RelationalTag.new('text-profile')
+  static tFilePath = RelationalTag.new('file-path')
 
   /**
    * @param {{
+   *  filePath?: string,
    *  maturity?: Maturity,
    *  difficulty?: Difficulty,
    *  topics?: Topic[],
@@ -266,6 +268,11 @@ export class TextProfile extends LibraryDescriptor {
    */
   constructor(data) {
     super()
+
+    /**
+     * @type {string|undefined}
+     */
+    this.filePath = data?.filePath
     
     /**
      * @type {Maturity}
@@ -314,6 +321,7 @@ export class TextProfile extends LibraryDescriptor {
   }
 
   static initTags() {
+    this.adoptTag(this.tFilePath)
     this.adoptTag(Maturity.t)
     this.adoptTag(Difficulty.t)
     this.adoptTag(Topic.t)
@@ -321,6 +329,12 @@ export class TextProfile extends LibraryDescriptor {
   }
 
   setTags() {
+    if (this.filePath !== undefined) {
+      const tfp = RelationalTag.new(this.filePath)
+      TextProfile.tFilePath.connect_to(tfp, TYPE_TO_TAG_CHILD)
+      tfp.connect_to(this)
+    }
+
     this.maturity.setTags()
     this.difficulty.setTags()
     this.topics.forEach((t) => t.setTags())

@@ -112,18 +112,17 @@ export class Context {
      * @type {string}
      */
     this.text = text
+    
     /**
      * @type {TextProfile}
      */
     this.profile = profile
+    profile.filePath = `${textPath}.profile.json`
+
     /**
      * @type {string}
      */
     this.textPath = textPath
-    /**
-     * @type {string}
-     */
-    this.profilePath = `${textPath}.profile.json`
   }
 }
 
@@ -701,10 +700,17 @@ export function listFiles(dir, pattern) {
  * 
  * @param {string} storyId 
  * @param {string} profilesDir
+ * 
+ * @returns {Promise<TextProfile>}
  */
 export function loadProfile(storyId, profilesDir) {
   const profilePattern = new RegExp(regexpEscape(`story-${storyId}`) + '/.+profile.json$')
   logger.debug('story %s profile search pattern=%s', storyId, profilePattern)
+
+  /**
+   * @type {string}
+   */
+  let storyPath
 
   return listFiles(profilesDir, profilePattern)
   .then((storyPaths) => {
@@ -715,11 +721,18 @@ export function loadProfile(storyId, profilesDir) {
         }
       })
     }
-    return storyPaths[0]
+    storyPath = storyPaths[0]
+    return storyPath
   })
   .then(loadText)
   .then(JSON.parse)
   .then((profileData) => {
-    return new TextProfile(profileData)
+    let profile = new TextProfile(profileData)
+
+    if (profile.filePath === undefined) {
+      profile.filePath = storyPath
+    }
+
+    return profile
   })
 }

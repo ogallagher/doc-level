@@ -267,38 +267,10 @@ export function *exportLibrary(library, format, startTagName, query, sort) {
         !next.done && ([book, bookSearchPath] = next.value);
         next = bookGen.next()
       ) {
-        yield `- title=${book.story.title} \n`
-        yield `  author=${book.story.authorName} \n`
-        yield `  id=${book.story.id}\n`
-  
-        yield `  index=${book.index} index-page=${book.indexPage.pageNumber} \n`
-  
-        if (book.profile !== undefined) {
-          yield `  reading-level=${book.profile.difficulty?.readingLevelName} `
-            + `years-of-education=${book.profile.difficulty?.yearsOfEducation}\n`
-  
-          yield `  restricted=${book.profile.maturity?.isRestricted} `
-          + (book.profile.maturity?.presents.join(' ')) + '\n'
-  
-          yield `  topics=` + book.profile.topics.map((topic) => topic.id).join(' ') + '\n'
-  
-          yield `  ideologies=` 
-          + (
-            book.profile.ideologies
-            .filter((ideology) => ideology.presence > 0.5)
-            .map((ideology) => `${ideology.id}[${ideology.presence}]`)
-            .join(' ')
-          ) + '\n'
+        yield '- \n'
+        for (let chunk of book.describe('  ', bookSearchPath)) {
+          yield chunk
         }
-        else {
-          yield `  <not yet profiled>\n`
-        }
-  
-        yield '  search-path='
-        yield bookSearchPath.map((conn) => {
-          // path to book only includes connections to tags
-          return (conn.weight !== null ? `[${conn.weight}]` : '') + conn.target.name
-        }).join('.')
   
         yield '\n\n'
       }
@@ -354,30 +326,8 @@ export function *exportLibrary(library, format, startTagName, query, sort) {
           bookId = `book-${nodes.size}`
           nodes.set(book, bookId)
           yield `${bookId}["`
-          yield `title=${book.story.title}\n`
-          yield `author=${book.story.authorName}\n`
-          yield `id=${book.story.id}\n`
-          yield `index=${book.index} index-page=${book.indexPage.pageNumber} \n`
-  
-          if (book.profile !== undefined) {
-            yield `reading-level=${book.profile.difficulty?.readingLevelName} `
-            + `years-of-education=${book.profile.difficulty?.yearsOfEducation}\n`
-    
-            yield `restricted=${book.profile.maturity?.isRestricted} `
-            + (book.profile.maturity?.presents.join(' ')) + '\n'
-    
-            yield `topics=` + book.profile.topics.map((topic) => topic.id).join(' ') + '\n'
-    
-            yield `ideologies=` 
-            + (
-              book.profile.ideologies
-              .filter((ideology) => ideology.presence > 0.5)
-              .map((ideology) => `${ideology.id}[${ideology.presence}]`)
-              .join(' ')
-            ) + '\n'
-          }
-          else {
-            yield `profile=none\n`
+          for (let chunk of book.describe()) {
+            yield chunk
           }
           yield `"]:::book\n`
         }
@@ -765,6 +715,51 @@ export class LibraryBook extends LibraryDescriptor {
     }
 
     return [parent, path]
+  }
+
+  /**
+   * Describe this book.
+   * 
+   * @param {string} indent
+   * @param {RelationalTagConnection[]|undefined} searchPath
+   * @returns {Generator<string>}
+   */
+  *describe(indent='', searchPath) {
+    yield `${indent}title=${this.story.title} \n`
+    yield `${indent}author=${this.story.authorName} \n`
+    yield `${indent}id=${this.story.id}\n`
+
+    yield `${indent}index=${this.index} index-page=${this.indexPage.pageNumber} \n`
+
+    if (this.profile !== undefined) {
+      yield `${indent}text-profile.file-path=${this.profile.filePath}\n`
+      yield `${indent}reading-level=${this.profile.difficulty?.readingLevelName} `
+        + `years-of-education=${this.profile.difficulty?.yearsOfEducation}\n`
+
+      yield `${indent}restricted=${this.profile.maturity?.isRestricted} `
+      + (this.profile.maturity?.presents.join(' ')) + '\n'
+
+      yield `${indent}topics=` + this.profile.topics.map((topic) => topic.id).join(' ') + '\n'
+
+      yield `${indent}ideologies=` 
+      + (
+        this.profile.ideologies
+        .filter((ideology) => ideology.presence > 0.5)
+        .map((ideology) => `${ideology.id}[${ideology.presence}]`)
+        .join(' ')
+      ) + '\n'
+    }
+    else {
+      yield `${indent}text-profile=<missing>\n`
+    }
+
+    if (searchPath !== undefined) {
+      yield `${indent}search-path=`
+      yield searchPath.map((conn) => {
+        // path to book only includes connections to tags
+        return (conn.weight !== null ? `[${conn.weight}]` : '') + conn.target.name
+      }).join('.')
+    }
   }
 
   static initTags() {

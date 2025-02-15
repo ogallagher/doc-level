@@ -399,10 +399,10 @@ async function createProfile(storyText, textPath) {
   logger.info('created profile for given textPath=%o', ctx.textPath)
 
   // save profile
-  logger.info('save profile to profilePath=%o', ctx.profilePath)
+  logger.info('save profile to profilePath=%o', ctx.profile.filePath)
   await writer.writeText(
     JSON.stringify(ctx.profile, undefined, 2),
-    ctx.profilePath
+    ctx.profile.filePath
   )
   logger.info('saved profile')
 
