@@ -1,4 +1,4 @@
-import { RelationalTag, RelationalTagConnection, RelationalTagException } from 'relational_tags'
+import { RelationalTag, RelationalTagConnection } from 'relational_tags'
 import { LibraryDescriptor } from './libraryDescriptor.js'
 import { Difficulty, Ideology, Maturity, TextProfile, Topic } from './textProfile.js'
 import { StoriesIndex, getStoriesIndex } from './storiesIndex.js'
@@ -490,13 +490,30 @@ export class Library extends LibraryDescriptor {
   }
 
   /**
-   * Adds the book to {@link Library.books}. 
+   * Adds the book to {@link Library.books}.
+   * 
+   * If a book with the same {@link Library._getKey key} is already in the library, it is replaced. 
    * 
    * @param {LibraryBook} book 
    */
   addBook(book) {
-    this.books.set(Library._getKey(book), book)
+    const bookKey = Library._getKey(book)
+    if (this.books.has(bookKey)) {
+      logger.debug('replace existing book %s', bookKey)
+      this.books.get(bookKey).unsetTags()
+      this.books.delete(bookKey)
+    }
+
+    this.books.set(bookKey, book)
     book.setTags()
+  }
+
+  /**
+   * @param {LibraryBook} book 
+   * @returns {boolean} Whether this book is in the library.
+   */
+  has(book) {
+    return this.books.has(Library._getKey(book))
   }
 
   /**
@@ -796,5 +813,13 @@ export class LibraryBook extends LibraryDescriptor {
     this.indexPage.setTags()
     this.index.setTags()
     this.profile?.setTags()
+  }
+
+  unsetTags() {
+    this.story.unsetTags()
+    this.indexPage.unsetTags()
+    this.index.unsetTags()
+    this.profile?.unsetTags()
+    super.unsetTags()
   }
 }

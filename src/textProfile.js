@@ -356,4 +356,12 @@ export class TextProfile extends LibraryDescriptor {
     this.topics.forEach((t) => t.setTags())
     this.ideologies.forEach((i) => i.setTags())
   }
+
+  unsetTags() {
+    this.maturity.unsetTags()
+    this.difficulty.unsetTags()
+    this.topics.forEach((t) => t.unsetTags())
+    this.ideologies.forEach((i) => i.unsetTags())
+    super.unsetTags()
+  }
 }

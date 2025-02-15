@@ -22,6 +22,10 @@ export class IndexPage extends LibraryDescriptor {
     this.filePath = filePath
   }
 
+  static fromData({indexName, pageNumber, filePath}) {
+    return new IndexPage(indexName, pageNumber, filePath)
+  }
+
   static initTags() {
     this.adoptTag(StoriesIndex.tName)
     this.adoptTag(this.tPageNumber)

@@ -1,7 +1,7 @@
 import assert from 'assert'
 import pino from 'pino'
 import path from 'path'
-import { RelationalTag } from 'relational_tags'
+import { RelationalTag as rt } from 'relational_tags'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
@@ -271,26 +271,26 @@ describe('library', () => {
     it('can return a lineage name for any tag', () => {
       const namespace = 'test-lineage-name'
 
-      let gen0 = RelationalTag.new(`${namespace}-gen0`)
+      let gen0 = rt.new(`${namespace}-gen0`)
       assert.strictEqual(getTagLineageName(gen0), gen0.name)
 
-      let gen1 = RelationalTag.new(`${namespace}-gen1`)
+      let gen1 = rt.new(`${namespace}-gen1`)
       gen0.connect_to(gen1, TYPE_TO_TAG_CHILD)
       assert.strictEqual(getTagLineageName(gen1), `${gen0.name}.${gen1.name}`)
       assert.strictEqual(getTagLineageName(gen0), gen0.name)
 
-      let gen2 = RelationalTag.new(`${namespace}-gen2`)
+      let gen2 = rt.new(`${namespace}-gen2`)
       gen1.connect_to(gen2, TYPE_TO_TAG_CHILD)
 
-      let gen3 = RelationalTag.new(`${namespace}-gen3`)
+      let gen3 = rt.new(`${namespace}-gen3`)
       gen2.connect_to(gen3, TYPE_TO_TAG_CHILD)
 
-      let gen4 = RelationalTag.new(`${namespace}-gen4`)
+      let gen4 = rt.new(`${namespace}-gen4`)
       gen3.connect_to(gen4, TYPE_TO_TAG_CHILD)
       // lineage exceeds library.TAG_LINEAGE_NAME_PARTS_MAX
       assert.notStrictEqual(getTagLineageName(gen4).split('.')[0], gen0.name)
 
-      let genOne = RelationalTag.new(`${namespace}-gen-one`)
+      let genOne = rt.new(`${namespace}-gen-one`)
       genOne.connect_to(gen0, 'TO_TAG_UNDIRECTED')
       // genOne has no parent tag
       assert.strictEqual(getTagLineageName(genOne), genOne.name)
@@ -341,6 +341,53 @@ describe('library', () => {
         )
       })
     })
+
+    describe('#addBook', () => {
+      it('replaces existing books with the same key', () => {
+        assert.ok(library.has(book1))
+        assert.ok(book1.profile !== undefined)
+        assert.ok(library.has(book2))
+        let bookCountBefore = library.books.size
+
+        // tags before
+        let booksBefore = [
+          ...library.getBooks(StorySummary.tAuthorName, 'twain, mark', 'asc')
+        ].map(([book, _pathToBook]) => book)
+        assert.strictEqual(booksBefore.length, 1)
+        assert.strictEqual(booksBefore[0], book1)
+
+        let book3 = new LibraryBook(
+          library, 
+          book1.story, 
+          book1.indexPage
+        )
+        assert.strictEqual(Library._getKey(book1), Library._getKey(book3))
+        assert.ok(book1.profile !== undefined)
+
+        library.addBook(book3)
+        let bookCountAfter = library.books.size
+        assert.ok(library.has(book3))
+        assert.ok(library.has(book1))
+        assert.strictEqual(bookCountBefore, bookCountAfter)
+
+        assert.strictEqual(
+          library.books.get(Library._getKey(book3)),
+          book3
+        )
+        assert.notStrictEqual(
+          library.books.get(Library._getKey(book1)),
+          book1
+        )
+
+        // tags after
+        let booksAfter = [
+          ...library.getBooks(StorySummary.tAuthorName, 'twain, mark', 'asc')
+        ].map(([book, _pathToBook]) => book)
+        assert.strictEqual(booksAfter.length, 1)
+        assert.strictEqual(booksAfter[0], book3)
+        assert.notStrictEqual(booksAfter[0], book1)
+      })
+    })
   })
 
   describe('LibraryBook', () => {
@@ -359,19 +406,19 @@ describe('library', () => {
         `book ${Library._getKey(book2)} without profile should not be connected to tag ${textProfile.Difficulty.tReadingLevel.name}`
       )
       // text-profile.topic.trout-competition
-      assert.strictEqual(RelationalTag.get('trout-competition').connections.size, 0)
+      assert.strictEqual(rt.get('trout-competition').connections.size, 0)
     })
 
     it('handles profiled stories', () => {
       library.addBook(book1)
 
       // text-profile.difficulty.years-of-education weighted connection
-      let connYearsOfEducation = RelationalTag.get('years-of-education').connections.get(book1.profile.difficulty)
+      let connYearsOfEducation = rt.get('years-of-education').connections.get(book1.profile.difficulty)
       assert.strictEqual(connYearsOfEducation.weight, book1.profile.difficulty.yearsOfEducation)
 
       // text-profile.topic.dreams-and-aspirations
       assert.strictEqual(book1.profile.topics[1].id, 'dreams-and-aspirations')
-      RelationalTag.get('dreams-and-aspirations').connections.has(book1.profile.topics[1])
+      rt.get('dreams-and-aspirations').connections.has(book1.profile.topics[1])
     })
   })
 
@@ -419,7 +466,7 @@ describe('library', () => {
         [StorySummary.tAuthorName, textProfile.Ideology.t, 4], //author-name--story--book--profile--ideology
       ]) {
         assert.strictEqual(
-          RelationalTag.graph_distance(a, b), 
+          rt.graph_distance(a, b), 
           d, 
           `graph distance from ${a.name} to ${b.name} should be ${d}`
         )
@@ -427,7 +474,7 @@ describe('library', () => {
     })
 
     it('are the only tagged entities', () => {
-      [...RelationalTag._tagged_entities.keys()].forEach((ent) => {
+      [...rt._tagged_entities.keys()].forEach((ent) => {
         assert.ok(ent instanceof LibraryDescriptor)
       })
     })

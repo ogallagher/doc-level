@@ -72,6 +72,13 @@ export class LibraryDescriptor extends SerializableEntity {
   }
 
   /**
+   * Effectively remove this descriptor from the library by removing its tag references.
+   */
+  unsetTags() {
+    RelationalTag.delete_entity(this)
+  }
+
+  /**
    * Set the parent of this object within the library, if unknown at instantiation or dynamic.
    * @param {LibraryDescriptor} parent
    */

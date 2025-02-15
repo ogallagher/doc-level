@@ -42,13 +42,6 @@ export const SEARCH_TAG_BOOKS_MAX = 50
 let logger
 
 export const argParser = yargs()
-.option('log-level', {
-  alias: 'l',
-  type: 'string',
-  description: '[pending; does not work yet] set log level',
-  default: 'info',
-  choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']
-})
 .option('fetch-stories-index', {
   alias: 'f',
   type: 'string',
@@ -56,23 +49,16 @@ export const argParser = yargs()
   // choices are unknown until indexes are initialized
   choices: undefined
 })
+.option('local-story-file', {
+  alias: 'F',
+  type: 'string',
+  description: 'Load an isolated story from a local full text file path.'
+})
 .option('fetch-stories-max', {
   alias: 'm',
   type: 'number',
   description: 'Max number of stories to fetch.',
   default: 10
-})
-.option('stories-dir', {
-  alias: 'd',
-  type: 'string',
-  description: 'Local filesystem directory where story lists and texts are saved.',
-  default: path.join('data', 'stories')
-})
-.option('profiles-dir', {
-  alias: 'D',
-  type: 'string',
-  description: 'Local directory where story profiles are saved.',
-  default: path.join('data', 'profiles')
 })
 .option('index', {
   alias: 'i',
@@ -91,11 +77,6 @@ export const argParser = yargs()
   alias: 's',
   type: 'string',
   description: 'Story id.'
-})
-.option('local-story-file', {
-  alias: 'F',
-  type: 'string',
-  description: 'Load an isolated story from a local full text file path.'
 })
 .option('story-length-max', {
   alias: 'n',
@@ -145,6 +126,18 @@ export const argParser = yargs()
     + 'Ex. "-t years-of-education -> asc" will sort easiest texts first.'
   )
 })
+.option('stories-dir', {
+  alias: 'd',
+  type: 'string',
+  description: 'Local filesystem directory where story lists and texts are saved.',
+  default: path.join('data', 'stories')
+})
+.option('profiles-dir', {
+  alias: 'D',
+  type: 'string',
+  description: 'Local directory where story profiles are saved.',
+  default: path.join('data', 'profiles')
+})
 .option('renders-dir', {
   alias: 'e',
   type: 'string',
@@ -156,9 +149,16 @@ export const argParser = yargs()
   type: 'boolean',
   description: (
     'Whether to reload library objects from the filesystem. '
-    + 'Default of false will not fetch recently updated/deleted items.'
+    + 'Not usually necessary unless files were changed manually.'
   ),
   default: false
+})
+.option('log-level', {
+  alias: 'l',
+  type: 'string',
+  description: '[pending; does not work yet] set log level',
+  default: 'info',
+  choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']
 })
 .alias('v', 'version')
 .option('help', {
