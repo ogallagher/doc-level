@@ -92,7 +92,7 @@ logger.setLevel = function(level) {
 }
 
 /**
- * @type {Library|undefined}
+ * @type {lib.Library|undefined}
  */
 let library
 
@@ -654,14 +654,21 @@ async function main(argSrc) {
    */
   let storyText
   /**
-   * @type {StorySummary}
+   * @type {StorySummary|undefined}
    */
   let storySummary
+  /**
+   * @type {IndexPage|undefined}
+   */
+  let indexPage
 
   // fetch story
   await new Promise(
     /**
-     * @param {function ({storyText: string[], storySummary: StorySummary}|undefined)} res 
+     * @param {function ({
+     *  storyText: string[], 
+     *  storySummary: StorySummary
+     * }|undefined)} res 
      */
     (res) => {
       if (args.story !== undefined) {
@@ -669,7 +676,7 @@ async function main(argSrc) {
         args.index = si.getStoriesIndex(args.index).name
     
         // fetch story if selected
-        const indexPage = indexPages.get(args.index).get(args.page)
+        indexPage = indexPages.get(args.index).get(args.page)
     
         logger.info('fetch index=%s page-%s=[%s] story=%s', args.index, args.page, indexPage.filePath, args.story)
         fetchStory(
@@ -684,6 +691,8 @@ async function main(argSrc) {
           args.index = storyInfo.indexPage.indexName
           args.page = storyInfo.indexPage.pageNumber
           args.story = storyInfo.storySummary.id
+          
+          indexPage = storyInfo.indexPage
 
           res(storyInfo)
         })
@@ -697,6 +706,12 @@ async function main(argSrc) {
     storyText = storyInfo?.storyText
     storySummary = storyInfo?.storySummary
   })
+
+  // add unprofiled story to library if exists
+  if (storySummary !== undefined) {
+    logger.info('add book for story %o to library', storySummary)
+    library.addBook(new lib.LibraryBook(library, storySummary, indexPage, undefined))
+  }
 
   // reduce story
   /**
