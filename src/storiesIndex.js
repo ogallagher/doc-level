@@ -1207,7 +1207,7 @@ export class ProjectGutenberg extends StoriesIndex {
 
     const pgraphs = storyPage
     .substring(startMatch.index + startMatch[0].length)
-    .split(/\n{2,}/)
+    .split(/[\n\r]{2,}/)
 
     for (let pgraph of pgraphs) {
        let p = pgraph.trim()
