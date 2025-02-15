@@ -5,7 +5,6 @@ import { StoriesIndex } from './storiesIndex.js'
 import { TYPE_TO_TAG_CHILD } from './library.js'
 
 export class IndexPage extends LibraryDescriptor {
-  static t = RelationalTag.new('index-page')
   static tPageNumber = RelationalTag.new('page-number')
   static tPageDir = RelationalTag.new('page-dir')
   static tPageFileName = RelationalTag.new('page-filename')

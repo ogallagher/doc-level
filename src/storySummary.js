@@ -3,7 +3,6 @@ import { LibraryDescriptor } from './libraryDescriptor.js'
 import { TYPE_TO_TAG_CHILD, getDateTag, getTextTag } from './library.js'
 
 export class StorySummary extends LibraryDescriptor {
-  static t = RelationalTag.new('story')
   static tAuthorName = RelationalTag.new('author-name')
   static tTitle = RelationalTag.new('title')
   static tPublishDate = RelationalTag.new('publish-date')

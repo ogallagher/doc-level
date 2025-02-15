@@ -32,9 +32,11 @@ export function init(parentLogger) {
 }
 
 export class Maturity extends LibraryDescriptor {  
-  static t = RelationalTag.new('maturity')
   // maturity types will be added on demand
-  static tRestricted = RelationalTag.new('restricted')
+  /**
+   * @type {RelationalTag}
+   */
+  static tRestricted
 
   constructor(isRestricted=undefined, presents=[], absents=[], examples=[]) {
     super()
@@ -70,6 +72,7 @@ export class Maturity extends LibraryDescriptor {
   }
 
   static initTags() {
+    this.tRestricted = RelationalTag.new('restricted')
     this.adoptTag(this.tRestricted)
   }
 
@@ -109,10 +112,18 @@ export class Maturity extends LibraryDescriptor {
  * Reading difficulty.
  */
 export class Difficulty extends LibraryDescriptor {
-  static t = RelationalTag.new('difficulty')
-  static tYearsOfEducation = RelationalTag.new('years-of-education')
-  static tReadingLevel = RelationalTag.new('reading-level')
-  static tDifficultWord = RelationalTag.new('difficult-word')
+  /**
+   * @type {RelationalTag}
+   */
+  static tYearsOfEducation
+  /**
+   * @type {RelationalTag}
+   */
+  static tReadingLevel
+  /**
+   * @type {RelationalTag}
+   */
+  static tDifficultWord
 
   constructor(yearsOfEducation=0, readingLevelName, reasons=[], difficultWords=[], difficultPhrases=[]) {
     super()
@@ -138,8 +149,11 @@ export class Difficulty extends LibraryDescriptor {
   }
 
   static initTags() {
+    this.tYearsOfEducation = RelationalTag.new('years-of-education')
     this.adoptTag(this.tYearsOfEducation)
+    this.tReadingLevel = RelationalTag.new('reading-level')
     this.adoptTag(this.tReadingLevel)
+    this.tDifficultWord = RelationalTag.new('difficult-word')
     this.adoptTag(this.tDifficultWord)
   }
 
@@ -171,8 +185,6 @@ export class Difficulty extends LibraryDescriptor {
 }
 
 export class Topic extends LibraryDescriptor {
-  static t = RelationalTag.new('topic')
-
   constructor(id, examplePhrases=[]) {
     super()
 
@@ -191,7 +203,7 @@ export class Topic extends LibraryDescriptor {
   }
 
   static initTags() {
-    // no child tags yet
+    // no static child tags
   }
 
   setTags() {
@@ -208,8 +220,10 @@ export class Topic extends LibraryDescriptor {
 }
 
 export class Ideology extends LibraryDescriptor {
-  static t = RelationalTag.new('ideology')
-  static tPresence = RelationalTag.new('presence')
+  /**
+   * @type {RelationalTag}
+   */
+  static tPresence
 
   constructor(id, presence, examplePhrases=[]) {
     super()
@@ -235,6 +249,7 @@ export class Ideology extends LibraryDescriptor {
   }
 
   static initTags() {
+    this.tPresence = RelationalTag.new('presence')
     this.adoptTag(this.tPresence)
   }
 
@@ -254,8 +269,7 @@ export class Ideology extends LibraryDescriptor {
 }
 
 export class TextProfile extends LibraryDescriptor {
-  static t = RelationalTag.new('text-profile')
-  static tFilePath = RelationalTag.new('file-path')
+  static tFilePath
 
   /**
    * @param {{
@@ -321,6 +335,7 @@ export class TextProfile extends LibraryDescriptor {
   }
 
   static initTags() {
+    this.tFilePath = RelationalTag.new('file-path')
     this.adoptTag(this.tFilePath)
     this.adoptTag(Maturity.t)
     this.adoptTag(Difficulty.t)

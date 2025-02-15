@@ -146,6 +146,15 @@ export const argParser = yargs()
   description: 'Local directory where library renderings/exports are saved.',
   default: path.join('data', 'renders')
 })
+.option('reload', {
+  alias: 'r',
+  type: 'boolean',
+  description: (
+    'Whether to reload library objects from the filesystem. '
+    + 'Default of false will not fetch recently updated/deleted items.'
+  ),
+  default: false
+})
 .alias('v', 'version')
 .option('help', {
   alias: 'h',
@@ -175,6 +184,7 @@ argParser.wrap(argParser.terminalWidth())
  *  skipProfile: boolean,
  *  showLibrary: string | undefined,
  *  rendersDir: string,
+ *  reload: boolean,
  *  tag: string | undefined,
  *  query: string | RegExp | undefined,
  *  sort: string,

@@ -61,7 +61,6 @@ export function getStoriesIndex(name) {
 }
 
 export class StoriesIndex extends LibraryDescriptor {
-  static t = RelationalTag.new('stories-index')
   static tUrlTemplate = RelationalTag.new('url-template')
   static tName = RelationalTag.new('index-name')
 

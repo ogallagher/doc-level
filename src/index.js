@@ -92,6 +92,11 @@ logger.setLevel = function(level) {
 }
 
 /**
+ * @type {Library|undefined}
+ */
+let library
+
+/**
  * 
  * @returns {Promise<undefined>}
  */
@@ -471,16 +476,23 @@ async function main(argSrc) {
   if (args.showLibrary !== undefined) {
     logger.info('show library in format=%s', args.showLibrary)
 
-    const library = await lib.getLibrary(
-      // for each index
-      [...indexPages.values()]
-      .map((pages) => {
-        // for each page number, return page objects
-        return [...pages.values()]
-      })
-      .flat(),
-      args.profilesDir
-    )
+    if (args.reload || library === undefined) {
+      logger.info('load library from filesystem')
+
+      library = await lib.getLibrary(
+        // for each index
+        [...indexPages.values()]
+        .map((pages) => {
+          // for each page number, return page objects
+          return [...pages.values()]
+        })
+        .flat(),
+        args.profilesDir
+      )
+    }
+    else {
+      logger.info('use existing library from memory')
+    }
     
     // open library render file
     await writer.initDir(args.rendersDir)

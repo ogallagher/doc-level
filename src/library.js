@@ -1,4 +1,4 @@
-import { RelationalTag, RelationalTagConnection } from 'relational_tags'
+import { RelationalTag, RelationalTagConnection, RelationalTagException } from 'relational_tags'
 import { LibraryDescriptor } from './libraryDescriptor.js'
 import { Difficulty, Ideology, Maturity, TextProfile, Topic } from './textProfile.js'
 import { StoriesIndex, getStoriesIndex } from './storiesIndex.js'
@@ -43,6 +43,36 @@ export const TAG_TEXT_LEN_MAX = 16
 export const TAG_LINEAGE_NAME_PARTS_MAX = 4
 
 /**
+ * Reset tags and call {@link LibraryDescriptor.initTags initTags} on every library descriptor.
+ */
+function initTags() {
+  RelationalTag.clear()
+
+  // LibraryDescriptor subclass root tags
+  Library.t = RelationalTag.new('library')
+  LibraryBook.t = RelationalTag.new('library-book')
+  IndexPage.t = RelationalTag.new('index-page')
+  StoriesIndex.t = RelationalTag.new('stories-index')
+  StorySummary.t = RelationalTag.new('story')
+  TextProfile.t = RelationalTag.new('text-profile')
+  Ideology.t = RelationalTag.new('ideology')
+  Topic.t = RelationalTag.new('topic')
+  Difficulty.t = RelationalTag.new('difficulty')
+  Maturity.t = RelationalTag.new('maturity')
+
+  Library.initTags()
+  LibraryBook.initTags()
+  IndexPage.initTags()
+  StoriesIndex.initTags()
+  StorySummary.initTags()
+  TextProfile.initTags()
+  Ideology.initTags()
+  Topic.initTags()
+  Difficulty.initTags()
+  Maturity.initTags() 
+}
+
+/**
  * Init module logger and tags for all subclasses of {@link LibraryDescriptor}.
  * 
  * @param {Logger} parentLogger
@@ -58,17 +88,7 @@ export function init(parentLogger) {
 
     RelationalTag.config(false)
 
-    // call initTags on every LibraryDescriptor
-    Maturity.initTags()
-    Difficulty.initTags()
-    Topic.initTags()
-    Ideology.initTags()
-    TextProfile.initTags()
-    StorySummary.initTags()
-    StoriesIndex.initTags()
-    IndexPage.initTags()
-    LibraryBook.initTags()
-    Library.initTags()
+    initTags()
 
     logger.debug('end init')
     res(logger)
@@ -76,6 +96,9 @@ export function init(parentLogger) {
 }
 
 /**
+ * Create a {@link Library} instance from the given filesystem.
+ * 
+ * Everything from previous `Library` instances is replaced.
  * 
  * @param {IndexPage[]} indexPages 
  * @param {string} profilesDir
@@ -83,6 +106,8 @@ export function init(parentLogger) {
  * @returns {Promise<Library>}
  */
 export async function getLibrary(indexPages, profilesDir) {
+  initTags()
+
   /**
    * @type {Promise[]}
    */
@@ -438,8 +463,6 @@ export function *exportLibrary(library, format, startTagName, query, sort) {
  * All items within the library are organized using [relational tagging](https://github.com/ogallagher/relational_tags).
  */
 export class Library extends LibraryDescriptor {
-  static t = RelationalTag.new('library')
-
   constructor() {
     // library is root of hierarchy; no parent
     super(undefined)
@@ -456,7 +479,7 @@ export class Library extends LibraryDescriptor {
   /**
    * Create unique id for the given book.
    * 
-   * Current implementation includes the index name nad page number, so if the same story id is present
+   * Current implementation includes the index name and page number, so if the same story id is present
    * on multiple pages, for example, they will are added as separate books.
    * 
    * @param {LibraryBook} book 
@@ -467,6 +490,7 @@ export class Library extends LibraryDescriptor {
   }
 
   /**
+   * Adds the book to {@link Library.books}. 
    * 
    * @param {LibraryBook} book 
    */
@@ -659,8 +683,6 @@ export class Library extends LibraryDescriptor {
 }
 
 export class LibraryBook extends LibraryDescriptor {
-  static t = RelationalTag.new('library-book')
-
   /**
    * @param {LibraryDescriptor} parent
    * @param {StorySummary} story 
