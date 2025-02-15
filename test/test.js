@@ -31,6 +31,24 @@ describe('textProfile', function() {
       assert.rejects(textProfile.init())
     })
   })
+
+  describe('TextProfile', () => {
+    describe('#getSerializable', () => {
+      before(async () => {
+        await readerInit(logger)
+      })
+
+      it('enables JSON.stringify of a profile instance', async () => {
+        let profile = new textProfile.TextProfile(
+          await loadText('test/resource/profiles/index1/story-restore2004_223748051577/피터정_현역가왕2---박서진-vs-강문경-신유-vs-진해성---정말-대박-무대였다!_excerpt.txt.profile.json')
+          .then(JSON.parse)
+        )
+
+        let serialized = JSON.stringify(profile, profile.getSerializable)
+        assert.strictEqual(profile.filePath, JSON.parse(serialized).filePath)
+      })
+    })
+  })
   
   describe('Maturity', function() {
     describe('#append', function() {

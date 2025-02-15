@@ -234,7 +234,14 @@ export class LocalStoriesIndex extends StoriesIndex {
   static indexName = 'local'
 
   constructor() {
-    super('file://path', [LocalStoriesIndex.indexName], 1, 1, 'index.json', undefined, undefined, true)
+    super(
+      `file://local-filesystem`, 
+      [LocalStoriesIndex.indexName], 
+      1, 1, 
+      'index.json', 
+      undefined, 
+      undefined, 
+      true)
   }
 
   getPageUrl() {

@@ -771,7 +771,7 @@ export class LibraryBook extends LibraryDescriptor {
     yield `${indent}index=${this.index} index-page=${this.indexPage.pageNumber} \n`
 
     if (this.profile !== undefined) {
-      yield `${indent}text-profile.file-path=${this.profile.filePath}\n`
+      yield `${indent}text-profile.file-path="${this.profile.filePath}"\n`
       yield `${indent}reading-level=${this.profile.difficulty?.readingLevelName} `
         + `years-of-education=${this.profile.difficulty?.yearsOfEducation}\n`
 

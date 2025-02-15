@@ -542,7 +542,7 @@ async function createProfile(storyText, textPath) {
   // save profile
   logger.info('save profile to profilePath=%o', ctx.profile.filePath)
   await writer.writeText(
-    JSON.stringify(ctx.profile, undefined, 2),
+    JSON.stringify(ctx.profile, ctx.profile.getSerializable, 2),
     ctx.profile.filePath
   )
   logger.info('saved profile')
@@ -708,7 +708,7 @@ async function main(argSrc) {
   })
 
   // add unprofiled story to library if exists
-  if (storySummary !== undefined) {
+  if (library !== undefined && storySummary !== undefined) {
     logger.info('add book for story %o to library', storySummary)
     library.addBook(new lib.LibraryBook(library, storySummary, indexPage, undefined))
   }
@@ -733,34 +733,43 @@ async function main(argSrc) {
   // create story profile
   if (storyText !== undefined) {
     if (!args.skipProfile) {
-      await createProfile(storyText.join('\n'), excerptPath)
+      const readerContext = await createProfile(storyText.join('\n'), excerptPath)
+      console.log(`created profile at ${readerContext.profile.filePath}`)
+
+      if (library !== undefined) {
+        logger.info('add book profile for story %o to library', storySummary)
+        library.addBook(new lib.LibraryBook(
+          library, storySummary, indexPage, readerContext.profile
+        ))
+      }
     }
     else {
-      console.log(`skip generate profile of story=${args.story} path=${excerptPath}`)
+      console.log(`skip generate profile of story=${args.story} path="${excerptPath}"`)
     }
   }
 
   // loop main
-  try {
-    await getArgSrc().then(main)
-  }
-  catch (err) {
-    if (err.code !== 'ABORT_ERR') {
-      throw err
-    }
-    else {
-      // readline.question prompt was aborted; normal program exit
-      process.exit()
-    }
-  }
+  await getArgSrc().then(main)
 }
 
 // init
-init()
+await init()
 // main
 .then(
-  () => {
-    main()
+  async () => {
+    try {
+      await main()
+    }
+    catch (err) {
+      // this catch is not working for all cases of readling.question abort
+      if (err.code !== 'ABORT_ERR') {
+        throw err
+      }
+      else {
+        // readline.question prompt was aborted; normal program exit.
+        process.exit()
+      }
+    }
   },
   (initErr) => {
     throw new Error(`error during initialization`, {
