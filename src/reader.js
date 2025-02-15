@@ -97,7 +97,7 @@ export function init(parentLogger, ai, chatModel, maturityModel, difficultWordsM
     _difficultPhrasesMax = difficultPhrasesMax
   
     logger.debug('end init')
-    res()
+    res(logger)
   })
 }
 

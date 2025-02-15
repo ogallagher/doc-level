@@ -4,7 +4,7 @@
 
 import * as dotenv from 'dotenv'
 import OpenAI from 'openai'
-import yargs from 'yargs/yargs'
+import yargs from 'yargs'
 import path from 'path'
 import { hideBin } from 'yargs/helpers'
 import { StoriesIndex } from './storiesIndex.js'
@@ -45,7 +45,7 @@ export const argParser = yargs()
 .option('log-level', {
   alias: 'l',
   type: 'string',
-  description: 'set log level',
+  description: '[pending; does not work yet] set log level',
   default: 'info',
   choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']
 })
@@ -147,7 +147,15 @@ export const argParser = yargs()
   default: path.join('data', 'renders')
 })
 .alias('v', 'version')
+.option('help', {
+  alias: 'h',
+  type: 'boolean',
+  default: false
+})
 .alias('h', 'help')
+.help(false)
+
+argParser.wrap(argParser.terminalWidth())
 
 /**
  * Load runtime arguments.
@@ -169,7 +177,8 @@ export const argParser = yargs()
  *  rendersDir: string,
  *  tag: string | undefined,
  *  query: string | RegExp | undefined,
- *  sort: string
+ *  sort: string,
+ *  help: boolean
  * }>}
  */
 export function loadArgs(argSrc=hideBin(process.argv)) {
@@ -239,6 +248,7 @@ function loadEnv() {
  * @param {Map<string, StoriesIndex>} storyIndexes
  * 
  * @returns {Promise<{
+ *  logger: Logger,
  *  ai: OpenAI,
  *  chatModel: string,
  *  maturityModel: string,
@@ -257,6 +267,7 @@ export function init(parentLogger) {
   .then((resEnv) => {
     logger.debug('end init')
     return {
+      logger,
       ai: resEnv.ai,
       chatModel: resEnv.chatModel,
       maturityModel: resEnv.maturityModel,

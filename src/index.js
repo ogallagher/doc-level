@@ -2,7 +2,6 @@
  * doc-level entrypoint.
  */
 
-import { RelationalTag } from 'relational_tags'
 import * as config from './config.js'
 import * as reader from './reader.js'
 import * as tp from './textProfile.js'
@@ -16,48 +15,105 @@ import { fileString } from './stringUtil.js'
 import * as lib from './library.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
+import { flushCliLogStream } from './pinoCliLogTransport.js'
 
 /**
  * @typedef {import('./storiesIndex.js').Story} Story
- */
+ *
+ * @typedef {{
+ *  destination: string,
+ *  mkdir: boolean,
+ *  append: boolean,
+ *  colorize: boolean,
+ *  sync: boolean
+ * }} TransportOptions
+ * 
+ * @typedef {import('pino').Logger} Logger
+*/
 
 /**
- * @type {pino.Logger}
+ * @type {Set<Logger>}
+ */
+const childLoggers = new Set()
+/**
+ * @param {Logger} childLogger 
+ */
+function addChildLogger(childLogger) {
+  childLoggers.add(childLogger)
+}
+
+/**
+ * @type {pino.Logger & {
+ *  setLevel: Function(string)
+ * }}
  */
 const logger = pino(
   {
     name: 'doc-level',
-    level: 'info'
-  }
+    level: 'debug'
+  },
+  pino.transport({
+    /**
+     * @type {{
+     *  target: string|WritableStream,
+     *  level: string,
+     *  options: TransportOptions
+     * }[]}
+     */
+    targets: [
+      // to file
+      {
+        target: 'pino-pretty',
+        level: 'debug',
+        options: {
+          destination: 'logs/doc-level_cli.log',
+          mkdir: true,
+          append: true,
+          colorize: false
+        }
+      },
+      // to process.stdout
+      {
+        target: path.join(import.meta.dirname, './pinoCliLogTransport.js'),
+        level: 'error'
+      }
+    ]
+  })
 )
+
+/**
+ * @param {string} level 
+ */
+logger.setLevel = function(level) {
+  // cascade level change to children
+  for (let childLogger of childLoggers.values()) {
+    childLogger.level = level
+  }
+}
 
 /**
  * 
  * @returns {Promise<undefined>}
  */
 function init() {
-  return new Promise((res) => {
-    // TODO relational-tags log level update is not working
-    RelationalTag.logger.level = 'error'
-    res()
-  })
-  .then(Promise.all([
-    tp.init(logger),
-    ms.init(logger),
-    writer.init(logger),
-    si.init(logger),
-    lib.init(logger)
-  ]))
+  return Promise.all([
+    tp.init(logger).then(addChildLogger),
+    ms.init(logger).then(addChildLogger),
+    writer.init(logger).then(addChildLogger),
+    si.init(logger).then(addChildLogger),
+    lib.init(logger).then(addChildLogger)
+  ])
   // config
   .then(() => {
     return config.init(logger)
     // init modules dependent on config
     .then(
       ({ 
-        ai, chatModel, maturityModel, 
+        logger: childLogger, ai, chatModel, maturityModel, 
         readingDifficultyWordsMax,
         readingDifficultyPhrasesMax
       }) => {
+        addChildLogger(childLogger)
         logger.info(
           'config.init passed. ai.baseUrl=%s chatModel=%s maturityModel=%s', 
           ai.baseURL, 
@@ -79,25 +135,22 @@ function init() {
 
 /**
  * 
- * @param {boolean} showHelp 
  * @returns 
  */
-function getArgSrc(showHelp) {
+function getArgSrc() {
   /**
    * @type {readline.Interface}
    */
   let rl
-  return (
-    showHelp ? config.argParser.getHelp() : Promise.resolve('')
-  )
-  .then((prompt) => {
+  return flushCliLogStream()
+  .then(() => {
     rl = readline.createInterface({
       input: process.stdin,
       // output to stderr avoids interfering with pino logger default output to stdout
-      output: process.stderr
+      output: process.stdout
     })
     
-    return rl.question(`${prompt}\n\n[opts]: `)
+    return rl.question('[--help for available options]\n[opts]: ')
   })
   .then((argSrc) => {
     rl.close()
@@ -367,9 +420,15 @@ async function main(argSrc) {
   // runtime args
   const args = await config.loadArgs(argSrc)
 
+  if (args.help) {
+    await config.argParser.getHelp()
+    .then((prompt) => {
+      console.log(prompt + '\n')
+    })
+  }
+
   // update logging
-  // TODO update of root logger level is not affecting child loggers
-  logger.level = args.logLevel
+  logger.setLevel(args.logLevel)
   logger.debug('root logger.level=%s', logger.level)
 
   // update filesystem, fetch new story summaries
@@ -392,7 +451,7 @@ async function main(argSrc) {
   ])
 
   // get available story index files
-  const indexPages = await fetchStoryIndexPages(args.storiesDir)
+  const indexPages = (args.help ? undefined : await fetchStoryIndexPages(args.storiesDir))
 
   /**
    * Story text as list of fragments.
@@ -404,11 +463,12 @@ async function main(argSrc) {
    */
   let storySummary
   
-  if (args.story === undefined && args.showLibrary === undefined) {
+  if (args.story === undefined && args.showLibrary === undefined && !args.help) {
     // show available local story lists if no story selected
     await showAvailableStories(indexPages)
   }
-  else if (args.showLibrary !== undefined) {
+  
+  if (args.showLibrary !== undefined) {
     logger.info('show library in format=%s', args.showLibrary)
 
     const library = await lib.getLibrary(
@@ -443,7 +503,7 @@ async function main(argSrc) {
     }
     
     renderFile.close()
-    logger.info('view library at %s', renderPath)
+    console.log('view library at %s', renderPath)
   }
 
   if (args.story !== undefined) {
@@ -491,14 +551,16 @@ async function main(argSrc) {
   }
 
   // loop main
-  getArgSrc(true).then(main)
+  getArgSrc().then(main)
 }
 
 // init
 init()
 // main
 .then(
-  main,
+  () => {
+    main()
+  },
   (initErr) => {
     throw new Error(`error during initialization`, {
       cause: initErr

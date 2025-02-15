@@ -23,6 +23,7 @@ let logger
  * Init module logger.
  * 
  * @param {Logger} parentLogger
+ * @returns {Promise<Logger>}
  */
 export function init(parentLogger) {
   return new Promise(function(res) {
@@ -33,7 +34,7 @@ export function init(parentLogger) {
     )
     
     logger.debug('end init')
-    res()
+    res(logger)
   })
 }
 

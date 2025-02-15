@@ -44,7 +44,7 @@ export function init(parentLogger) {
     }
 
     logger.debug('end init')
-    res()
+    res(logger)
   })
 }
 
