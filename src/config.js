@@ -92,6 +92,11 @@ export const argParser = yargs()
   type: 'string',
   description: 'Story id.'
 })
+.option('local-story-file', {
+  alias: 'F',
+  type: 'string',
+  description: 'Load an isolated story from a local full text file path.'
+})
 .option('story-length-max', {
   alias: 'n',
   type: 'number',
@@ -180,6 +185,7 @@ argParser.wrap(argParser.terminalWidth())
  *  index: string,
  *  page: number,
  *  story: string | undefined,
+ *  localStoryFile: string | undefined,
  *  storyLengthMax: number,
  *  skipProfile: boolean,
  *  showLibrary: string | undefined,

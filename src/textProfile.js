@@ -290,12 +290,16 @@ export class TextProfile extends LibraryDescriptor {
      * @type {Maturity}
      */
     this.maturity
-    this.setMaturity(Maturity.fromData(data?.maturity))
+    this.setMaturity(
+      data?.maturity !== undefined ? Maturity.fromData(data?.maturity) : new Maturity()
+    )
     /**
      * @type {Difficulty}
      */
     this.difficulty
-    this.setDifficulty(Difficulty.fromData(data?.difficulty))
+    this.setDifficulty(
+      data?.difficulty !== undefined ? Difficulty.fromData(data?.difficulty) : new Difficulty()
+    )
     /**
      * @type {Topic[]}
      */

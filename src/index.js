@@ -139,8 +139,7 @@ function init() {
 }
 
 /**
- * 
- * @returns 
+ * @returns {Promise<string>}
  */
 function getArgSrc() {
   /**
@@ -243,6 +242,90 @@ async function showAvailableStories(indexPages) {
     .join('\n')
   )
   console.log(browseStoriesPrompt)
+}
+
+/**
+ * Generate story summary and load full text from local filesystem.
+ * 
+ * // TODO Also create a virtual {@link StoriesIndex index} and page to store the
+ * generated {@link StorySummary}.
+ * 
+ * @param {string} localStoryPath 
+ * 
+ * @returns {Promise<{storyText: string[], storySummary: StorySummary}>}
+ */
+async function fetchLocalStory(localStoryPath) {
+  await flushCliLogStream()
+
+  // load full text
+  /**
+   * @type {Promise<string>}
+   */
+  let fullText = reader.loadText(localStoryPath)
+
+  // prompt for story metadata
+  /**
+   * @type {readline.Interface}
+   */
+  let rl = readline.createInterface({
+    input: process.stdin,
+    // output to stderr avoids interfering with pino logger default output to stdout
+    output: process.stdout
+  })
+
+  let id = path.basename(localStoryPath)
+  let authorName 
+  while (authorName === undefined) {
+    authorName = await rl.question('[author-name]: ')
+    if (authorName.trim().length === 0) {
+      logger.error('author name is required')
+      authorName = undefined
+    }
+  }
+  let title
+  while (title === undefined) {
+    title = await rl.question('[title]: ')
+    if (title.trim().length === 0) {
+      logger.error('title is required')
+      title = undefined
+    }
+  }
+  let publishDate
+  while (publishDate === undefined) {
+    publishDate = await rl.question('[publish-date]: ')
+    try {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(publishDate)) {
+        publishDate = new Date(publishDate.trim())
+      }
+      else {
+        throw new Error('expected date format not found', {
+          cause: publishDate
+        })
+      }
+    }
+    catch (err) {
+      logger.error('unable to parse given date; must be YYYY-MM-DD format. %s', err)
+      publishDate = undefined
+    }
+  }
+
+  let viewCount = -1
+  let url = `file://${localStoryPath}`
+  let excerpts = []
+
+  rl.close()
+
+  const story = new StorySummary(
+    id, authorName, title, new Date(publishDate), viewCount, url, excerpts
+  )
+  console.log(`load full text for ${story}`)
+
+  return fullText.then((fullText) => {
+    return {
+      storyText: fullText.split(/\n/).filter((pgraph) => pgraph.trim().length > 0),
+      storySummary: story
+    }
+  })
 }
 
 /**
@@ -436,40 +519,34 @@ async function main(argSrc) {
   logger.setLevel(args.logLevel)
   logger.debug('root logger.level=%s', logger.level)
 
-  // update filesystem, fetch new story summaries
+  // update filesystem 
   await Promise.all([
-    writer.initDir(args.storiesDir)
-    .then(async () => {
-      if (args.fetchStoriesIndex !== undefined) {
-        await fetchStorySummaries(
-          si.getStoriesIndex(args.fetchStoriesIndex),
-          args.fetchStoriesMax,
-          args.storiesDir
-        )
-      }
-      else {
-        logger.debug('skip story summaries fetch')
-      }
-    }),
-
+    writer.initDir(args.storiesDir),
     writer.initDir(args.profilesDir)
   ])
 
+  // fetch new story summaries
+  if (args.fetchStoriesIndex !== undefined) {
+    await fetchStorySummaries(
+      si.getStoriesIndex(args.fetchStoriesIndex),
+      args.fetchStoriesMax,
+      args.storiesDir
+    )
+  }
+  else {
+    logger.debug('skip story summaries fetch')
+  }
+
   // get available story index files
   const indexPages = (args.help ? undefined : await fetchStoryIndexPages(args.storiesDir))
-
-  /**
-   * Story text as list of fragments.
-   * @type {string[]|undefined}
-   */
-  let storyText
-  /**
-   * @type {StorySummary}
-   */
-  let storySummary
   
-  if (args.story === undefined && args.showLibrary === undefined && !args.help) {
-    // show available local story lists if no story selected
+  // show available local story lists if no story selected
+  if (
+    args.story === undefined 
+    && args.localStoryFile === undefined
+    && args.showLibrary === undefined 
+    && !args.help
+  ) {
     await showAvailableStories(indexPages)
   }
   
@@ -518,22 +595,54 @@ async function main(argSrc) {
     console.log('view library at %s', renderPath)
   }
 
-  if (args.story !== undefined) {
-    // resolve index alias
-    args.index = si.getStoriesIndex(args.index).name
+  /**
+   * Story text as list of fragments.
+   * @type {string[]|undefined}
+   */
+  let storyText
+  /**
+   * @type {StorySummary}
+   */
+  let storySummary
 
-    // fetch story if selected
-    const indexPage = indexPages.get(args.index).get(args.page)
+  // fetch story
+  await new Promise(
+    /**
+     * @param {function ({storyText: string[], storySummary: StorySummary}|undefined)} res 
+     */
+    (res) => {
+      if (args.story !== undefined) {
+        // resolve index alias
+        args.index = si.getStoriesIndex(args.index).name
+    
+        // fetch story if selected
+        const indexPage = indexPages.get(args.index).get(args.page)
+    
+        logger.info('fetch index=%s page-%s=[%s] story=%s', args.index, args.page, indexPage.filePath, args.story)
+        fetchStory(
+          args.storiesDir, indexPage.filePath, args.index, args.page, args.story
+        ).then(res)
+        logger.debug('fetched storySummary=%o', storySummary)
+      }
+      else if (args.localStoryFile !== undefined) {
+        // resolve virtual index
+        args.index = 'local'
 
-    logger.info('fetch index=%s page-%s=[%s] story=%s', args.index, args.page, indexPage.filePath, args.story)
-    await fetchStory(
-      args.storiesDir, indexPage.filePath, args.index, args.page, args.story
-    ).then((storyInfo) => {
-      storyText = storyInfo.storyText
-      storySummary = storyInfo.storySummary
-    })
-    logger.debug('fetched storySummary=%o', storySummary)
-  }
+        fetchLocalStory(args.localStoryFile)
+        .then((storyInfo) => {
+          args.story = storyInfo.storySummary.id
+          res(storyInfo)
+        })
+      }
+      else {
+        res()
+      }
+    }
+  )
+  .then((storyInfo) => {
+    storyText = storyInfo?.storyText
+    storySummary = storyInfo?.storySummary
+  })
 
   // reduce story
   /**
@@ -558,7 +667,7 @@ async function main(argSrc) {
       await createProfile(storyText.join('\n'), excerptPath)
     }
     else {
-      logger.info('skip generate profile of story=%s path=%s', args.story, excerptPath)
+      console.log(`skip generate profile of story=${args.story} path=${excerptPath}`)
     }
   }
 
