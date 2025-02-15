@@ -183,7 +183,7 @@ async function fetchStoryIndexPages(storiesDir) {
   await (
     reader.listFiles(storiesDir, /index.json$/)
     .then((indexPaths) => {
-      logger.debug('parsing %s story index page paths', indexPages.length)
+      logger.debug('parsing %s story index page paths', indexPages.size)
       const pagePathRegExp = /\/([^\/]+)\/page-(\d+)/
       
       indexPaths.forEach(
@@ -373,15 +373,6 @@ async function fetchLocalStory(localStoryPath, storiesDir) {
 }
 
 /**
- * Create or load an existing index page and add the given story to it.
- * 
- * @param {StorySummary} story 
- */
-async function updateIndexPage(story) {
-  
-}
-
-/**
  * Fetch story summary and full text as list of fragments.
  * 
  * @param {string} storiesDir
@@ -413,48 +404,63 @@ async function fetchStory(storiesDir, storyIndexPath, storyIndexName, storyIndex
 
   const storyIndex = si.getStoriesIndex(storyIndexName)
 
-  // download full story webpage to temp file
+  // check for existing local files to skip ahead
   const tempDir = path.join(`data/temp/${storyIndexName}/page-${storyIndexPage}/story-${storyId}`)
-  await writer.initDir(tempDir)
-  const storyWebpagePath = await writer.downloadWebpage(
-    new URL(storySummary.url), 
-    path.join(
-      tempDir, 
-      `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}${storyIndex.storyFileExt}`
-    ),
-    true
-  )
-
-  // convert story webpage to full text
-  const storyPage = (
-    storyIndex.storyFileExt === '.html'
-    ? (await reader.parseHtml(storyWebpagePath))
-    : (await reader.loadText(storyWebpagePath))
-  )
+  const webpageFile = `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}${storyIndex.storyFileExt}`
   const storyFullTextPath = path.join(
     storiesDir, storyIndexName, `story-${storyId}`, 
     `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.txt`
   )
-  await writer.initDir(path.dirname(storyFullTextPath))
 
-  let textGenerator = si.getStoriesIndex(storyIndexName).getStoryText(storyPage)
+  let fullTextFileExists = await writer.fileExists(storyFullTextPath)
   /**
    * @type {string[]}
    */
   let storyText = []
-  /**
-   * @type {string}
-   */
-  let textFragment
-  let storyFile = await writer.openFile(storyFullTextPath)
-  while (textFragment = textGenerator.next().value) {
-    // create local reference so that next iteration can fetch while file is open
-    storyText.push(textFragment)
-    await writer.writeText(textFragment + '\n\n', storyFile)
-  }
-  storyFile.close()
+
+  if (!fullTextFileExists) {
+    // download full story webpage to temp file
+    await writer.initDir(tempDir)
+    const storyWebpagePath = await writer.downloadWebpage(
+      new URL(storySummary.url), 
+      path.join(tempDir, webpageFile),
+      true
+    )
+
+    // convert story webpage to full text
+    const storyPage = (
+      storyIndex.storyFileExt === '.html'
+      ? (await reader.parseHtml(storyWebpagePath))
+      : (await reader.loadText(storyWebpagePath))
+    )
+    
+    await writer.initDir(path.dirname(storyFullTextPath))
+
+    let textGenerator = si.getStoriesIndex(storyIndexName).getStoryText(storyPage)
   
-  logger.info('saved story=%s paragraph-count=%s to %s', storyId, storyText.length, storyFullTextPath)
+    /**
+     * @type {string}
+     */
+    let textFragment
+    let storyFile = await writer.openFile(storyFullTextPath)
+    while (textFragment = textGenerator.next().value) {
+      // create local reference so that next iteration can fetch while file is open
+      storyText.push(textFragment)
+      await writer.writeText(textFragment + '\n\n', storyFile)
+    }
+    storyFile.close()
+    
+    logger.info('saved story=%s paragraph-count=%s to %s', storyId, storyText.length, storyFullTextPath)
+  }
+  else {
+    logger.info('local full text exists at "%s"; load from local instead of download', storyFullTextPath)
+    storyText = await reader.loadText(storyFullTextPath)
+    .then((rawText) => rawText.split(/[\n\r]{2,}/))
+    
+    logger.info('loaded story=%s paragraph-count=%s from %s', storyId, storyText.length, storyFullTextPath)
+  }
+
+  
   return { storyText, storySummary }
 }
 
@@ -682,7 +688,6 @@ async function main(argSrc) {
         fetchStory(
           args.storiesDir, indexPage.filePath, args.index, args.page, args.story
         ).then(res)
-        logger.debug('fetched storySummary=%o', storySummary)
       }
       else if (args.localStoryFile !== undefined) {
         fetchLocalStory(args.localStoryFile, args.storiesDir)
@@ -705,6 +710,10 @@ async function main(argSrc) {
   .then((storyInfo) => {
     storyText = storyInfo?.storyText
     storySummary = storyInfo?.storySummary
+
+    if (storySummary !== undefined) {
+      logger.debug('fetched storySummary=%o', storySummary)
+    }
   })
 
   // add unprofiled story to library if exists
