@@ -245,16 +245,45 @@ async function showAvailableStories(indexPages) {
 }
 
 /**
+ * @param {StorySummary} story 
+ * @param {string} storiesDir
+ * @returns {Promise<IndexPage>}
+ */
+async function updateLocalIndexPage(story, storiesDir) {
+  const index = si.getStoriesIndex(si.LocalStoriesIndex.indexName)
+  const {page, stories} = await reader.getIndexPage(index.name, index.pageNumberMin, storiesDir)
+
+  // delete existing story with same id
+  for (let [storyListIndex, pageStory] of stories.entries()) {
+    if (pageStory.id === story.id) {
+      console.log(`found and replaced existing story ${pageStory.id}`)
+      stories.splice(storyListIndex, 1)
+    }
+  }
+
+  stories.push(story)
+
+  await writer.initDir(path.dirname(page.filePath))
+  await writer.writeText(JSON.stringify(stories, undefined, 2), page.filePath)
+  return page
+}
+
+/**
  * Generate story summary and load full text from local filesystem.
  * 
- * // TODO Also create a virtual {@link StoriesIndex index} and page to store the
+ * Also updates a virtual {@link StoriesIndex index} and page to store the
  * generated {@link StorySummary}.
  * 
  * @param {string} localStoryPath 
+ * @param {string} storiesDir
  * 
- * @returns {Promise<{storyText: string[], storySummary: StorySummary}>}
+ * @returns {Promise<{
+ *  storyText: string[], 
+ *  storySummary: StorySummary,
+ *  indexPage: IndexPage
+ * }>}
  */
-async function fetchLocalStory(localStoryPath) {
+async function fetchLocalStory(localStoryPath, storiesDir) {
   await flushCliLogStream()
 
   // load full text
@@ -276,25 +305,33 @@ async function fetchLocalStory(localStoryPath) {
   let id = path.basename(localStoryPath)
   let authorName 
   while (authorName === undefined) {
-    authorName = await rl.question('[author-name]: ')
+    const defaultAuthorName = 'anonymous'
+
+    authorName = await rl.question(`[author-name] [default=${defaultAuthorName}]: `)
     if (authorName.trim().length === 0) {
-      logger.error('author name is required')
-      authorName = undefined
+      logger.debug('use default author name')
+      authorName = defaultAuthorName
     }
   }
   let title
   while (title === undefined) {
-    title = await rl.question('[title]: ')
+    const defaultTitle = path.basename(localStoryPath).replace(/\.\w+$/, '')
+
+    title = await rl.question(`[title] [default=${defaultTitle}]: `)
     if (title.trim().length === 0) {
-      logger.error('title is required')
-      title = undefined
+      logger.debug('use default title')
+      title = defaultTitle
     }
   }
   let publishDate
   while (publishDate === undefined) {
-    publishDate = await rl.question('[publish-date]: ')
+    publishDate = await rl.question('[publish-date] [default=today]: ')
     try {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(publishDate)) {
+      if (publishDate.trim().length === 0) {
+        logger.debug('use default publish-date')
+        publishDate = new Date()
+      }
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(publishDate)) {
         publishDate = new Date(publishDate.trim())
       }
       else {
@@ -320,12 +357,28 @@ async function fetchLocalStory(localStoryPath) {
   )
   console.log(`load full text for ${story}`)
 
-  return fullText.then((fullText) => {
-    return {
-      storyText: fullText.split(/\n/).filter((pgraph) => pgraph.trim().length > 0),
-      storySummary: story
-    }
-  })
+  let [indexPage, storyText] = await Promise.all([
+    // update local index page
+    updateLocalIndexPage(story, storiesDir),
+
+    // convert full text to list of fragments
+    fullText.then((fullText) => fullText.split(/\n/).filter((pgraph) => pgraph.trim().length > 0))
+  ])
+
+  return {
+    storySummary: story,
+    storyText,
+    indexPage
+  }
+}
+
+/**
+ * Create or load an existing index page and add the given story to it.
+ * 
+ * @param {StorySummary} story 
+ */
+async function updateIndexPage(story) {
+  
 }
 
 /**
@@ -625,12 +678,13 @@ async function main(argSrc) {
         logger.debug('fetched storySummary=%o', storySummary)
       }
       else if (args.localStoryFile !== undefined) {
-        // resolve virtual index
-        args.index = 'local'
-
-        fetchLocalStory(args.localStoryFile)
+        fetchLocalStory(args.localStoryFile, args.storiesDir)
         .then((storyInfo) => {
+          // select local story for subsequent operations
+          args.index = storyInfo.indexPage.indexName
+          args.page = storyInfo.indexPage.pageNumber
           args.story = storyInfo.storySummary.id
+
           res(storyInfo)
         })
       }
@@ -672,7 +726,18 @@ async function main(argSrc) {
   }
 
   // loop main
-  getArgSrc().then(main)
+  try {
+    await getArgSrc().then(main)
+  }
+  catch (err) {
+    if (err.code !== 'ABORT_ERR') {
+      throw err
+    }
+    else {
+      // readline.question prompt was aborted; normal program exit
+      process.exit()
+    }
+  }
 }
 
 // init

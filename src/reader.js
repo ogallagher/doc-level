@@ -4,7 +4,7 @@
 
 import { zodResponseFormat } from 'openai/helpers/zod'
 import path from 'path'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, access as fsAccess, constants as fsConstants } from 'node:fs/promises'
 import * as HtmlParser from 'node-html-parser'
 import { Maturity, TextProfile, Difficulty, Topic, MATURITY_TYPE_PROFANE, Ideology } from './textProfile.js'
 import { CustomMaturityTypes, Ideologies, ReadingDifficulty, Topics } from './messageSchema.js'
@@ -21,6 +21,7 @@ import {
 import { StoriesIndex } from './storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { downloadWebpage, fileExists, initDir, writeText } from './writer.js'
+import { IndexPage } from './indexPage.js'
 
 /**
  * @typedef {import('pino').Logger} Logger
@@ -292,6 +293,7 @@ export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
         })
         .then(
           /**
+           * Collect story summaries from the index page and save the page to filesystem.
            * 
            * @param {Generator<StorySummary>} storySummariesGenerator
            */
@@ -735,4 +737,34 @@ export function loadProfile(storyId, profilesDir) {
 
     return profile
   })
+}
+
+/**
+ * @param {string} indexName 
+ * @param {number} pageNumber 
+ * @param {string} storiesDir 
+ * @returns {Promise<{page: IndexPage, stories: StorySummary[]}>}
+ */
+export async function getIndexPage(indexName, pageNumber, storiesDir) {
+  const page = new IndexPage(
+    indexName, 
+    pageNumber, 
+    path.join(storiesDir, indexName, `page-${pageNumber}`, 'index.json')
+  )
+  /**
+   * @type {StorySummary[]}
+   */
+  let stories = []
+
+  try {
+    await fsAccess(page.filePath, fsConstants.F_OK)
+    logger.debug('found existing page %o', page)
+
+    stories = await loadText(page.filePath).then(JSON.parse)
+  }
+  catch {
+    logger.info('create new page %o', page)
+  }
+
+  return { page, stories }
 }

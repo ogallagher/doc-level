@@ -35,6 +35,8 @@ export function init(parentLogger) {
 
     // create and register indexes
     if (storiesIndexes.size === 0) {
+      new LocalStoriesIndex()
+
       new MunjangStoriesIndex()
       new PaisStoriesIndex('opinion/columnas')
       new WashingtonPostStoriesIndex('/opinions/columns')
@@ -49,8 +51,9 @@ export function init(parentLogger) {
 }
 
 export function getStoryIndexNames() {
-  logger.info('storyIndexNames=%o', [...storiesIndexes.keys()])
-  return [...storiesIndexes.keys()]
+  return [...storiesIndexes.entries()]
+  .map(([alias, index]) => (index.hide ? undefined : alias))
+  .filter((n) => n !== undefined)
 }
 
 /**
@@ -80,13 +83,15 @@ export class StoriesIndex extends LibraryDescriptor {
    * @param {number} pageNumberMax 
    * @param {string} pageFilename
    * @param {any} pageRequestHeaders
+   * @param {boolean} hide
    */
   constructor(
     urlTemplate, names, 
     pageNumberMin = 0, pageNumberMax = 50, 
     pageFilename = 'index.html',
     pageRequestHeaders = undefined,
-    storyFileExt = '.html'
+    storyFileExt = '.html',
+    hide = false
   ) {
     super()
     
@@ -119,10 +124,15 @@ export class StoriesIndex extends LibraryDescriptor {
      * File extension of a story page, indicating the file type.
      */
     this.storyFileExt = storyFileExt
+    /**
+     * @type {boolean}
+     */
+    this.hide = hide
 
     // define tags early so that aliases are also defined
     this.setTags()
 
+    // register index as available
     names.forEach((alias) => {
       if (!storiesIndexes.has(alias)) {
         storiesIndexes.set(alias, this)
@@ -217,6 +227,33 @@ export class StoriesIndex extends LibraryDescriptor {
     let tn = StoriesIndex.getNameTag(this.name)
     StoriesIndex.tName.connect_to(tn, TYPE_TO_TAG_CHILD)
     tn.connect_to(this)
+  }
+}
+
+export class LocalStoriesIndex extends StoriesIndex {
+  static indexName = 'local'
+
+  constructor() {
+    super('file://path', [LocalStoriesIndex.indexName], 1, 1, 'index.json', undefined, undefined, true)
+  }
+
+  getPageUrl() {
+    throw new Error('virtual index for local filesystem does not have page urls')
+  }
+
+  /**
+   * Returns the story summaries directly from the given page content.
+   * 
+   * @param {StorySummary[]} indexPage 
+   */
+  *getStorySummaries(indexPage) {
+    for (let story of indexPage) {
+      yield story
+    }
+  }
+
+  *getStoryText(storyPage) {
+    throw new Error('virtual index for local filesystem does not have story pages')
   }
 }
 

@@ -11,14 +11,14 @@ export class IndexPage extends LibraryDescriptor {
 
   /**
    * @param {string} indexName
-   * @param {string} pageNumber
+   * @param {string|number} pageNumber
    * @param {string} filePath
    */
   constructor(indexName, pageNumber, filePath) {
     super()
 
     this.indexName = indexName
-    this.pageNumber = pageNumber
+    this.pageNumber = (typeof pageNumber === 'number' ? pageNumber : Number(pageNumber).toString())
     this.filePath = filePath
   }
 

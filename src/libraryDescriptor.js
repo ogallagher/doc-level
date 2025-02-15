@@ -68,7 +68,7 @@ export class LibraryDescriptor extends SerializableEntity {
    * Register an instance of this descriptor as a library item.
    */
   setTags() {
-    LibraryDescriptor.throwErrorNotImplemented('registerItem')
+    LibraryDescriptor.throwErrorNotImplemented('setTags')
   }
 
   /**
