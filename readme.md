@@ -1134,6 +1134,8 @@ Let's generate a profile of the first story in `internet/page-0/index.json`.
 
 ```shell
 [opts]: -i internet -p 0 -s aa_111
+# or, below equivalent
+[opts]: -i internet -p @first -s @first
 ```
 
 ```txt
@@ -1280,6 +1282,10 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 | `-e, --renders-dir` | Local directory where library renderings/exports are saved. | |
 | `-r, --reload` | Whether to reload library objects from the filesystem. Not usually necessary unless files were changed manually. | `-L` |
 | `-v, --version` | Show app version. | |
+
+For `--story`, instead of providing a story id, you can also use variable expressions `@first` for the first story in the page, `@next` for the next story in the page, or `@<array-index>` for the story at a given index within the page stories array. `@first` and `@0` are equivalent.
+
+Similarly for `--page`, instead of providing a page number, you can also use variable expressions `@first` for the first page in the stories index, or `@next` for the next page.
 
 # Development
 

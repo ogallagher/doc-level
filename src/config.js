@@ -68,7 +68,10 @@ export const argParser = (
   .option('story', {
     alias: 's',
     type: 'string',
-    description: 'Identifier of a story to be loaded and profiled.'
+    description: (
+      'Identifier of a story to be loaded and profiled. '
+      + `Accepts variable expressions ${OPT_VAR_PREFIX}${OPT_VAR_FIRST}, ${OPT_VAR_PREFIX}${OPT_VAR_NEXT}, ${OPT_VAR_PREFIX}<array-index>.`
+    )
   })
   .option('index', {
     alias: 'i',
@@ -80,7 +83,10 @@ export const argParser = (
   .option('page', {
     alias: 'p',
     type: 'string',
-    description: 'Page number within stories index.',
+    description: (
+      'Page number within stories index. '
+      + `Accepts variable expressions ${OPT_VAR_PREFIX}${OPT_VAR_FIRST}, ${OPT_VAR_PREFIX}${OPT_VAR_NEXT}.`
+    ),
     default: `${OPT_VAR_PREFIX}${OPT_VAR_FIRST}`
   })
   .option('story-length-max', {
