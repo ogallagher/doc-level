@@ -212,7 +212,9 @@ export async function resolvePageVar(pageOpt, pagePrev, indexName) {
 
 /**
  * @param {string} storyOpt 
- * @param {number} storyPrev 
+ * @param {string|undefined} storyPrev Previous story id. If `undefined` or not present in the current 
+ * page, assumed equivalent to story array index `-1`, the next being `0` for the first story in the 
+ * current page.
  * @param {string} pagePath
  * 
  * @returns {Promise<StorySummary|number>} The story if within the bounds of the page, or `+/-infinity` if
@@ -228,7 +230,12 @@ export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
       return stories[0]
     }
     else if (storyVar === config.OPT_VAR_NEXT) {
-      storyArrayIndex = storyPrev + 1
+      if (storyPrev === undefined) {
+        storyArrayIndex = 0
+      }
+      else {
+        storyArrayIndex = stories.findIndex((s) => s.id === storyPrev) + 1
+      }
     }
     else if (!isNaN(storyVar)) {
       storyArrayIndex = parseInt(storyVar)
@@ -254,7 +261,7 @@ export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
   }
   else {
     // value of story option is not a variable
-    return storyOpt
+    return await reader.loadStory(pagePath, storyOpt)
   }
 }
 
@@ -564,7 +571,7 @@ function getExcerptPath(profilesDir, indexName, storyId, authorName, storyTitle)
 async function reduceStory(storyText, storyLengthMax, excerptPath) {
   if (await writer.fileExists(excerptPath)) {
     logger.info('load excerpt from existing local file path="%s"', excerptPath)
-    return (await reader.loadText(excerptPath)).split('\n')
+    return (await reader.loadText(excerptPath)).split('\n').filter((pgraph) => pgraph.length > 0)
   }
   else {
     const excerpt = await reader.reduceStory(storyText, storyLengthMax)
@@ -662,11 +669,11 @@ async function createProfile(storyText, textPath, replaceIfExists) {
  * 
  * @param {string|undefined} argSrc
  * @param {number} pagePrev Previous stories index page number.
- * @param {number} storyPrev Previous story array index.
+ * @param {string|undefined} storyPrev Previous story id.
  * 
  * @returns {Promise<string>}
  */
-async function main(argSrc, pagePrev=-1, storyPrev=-1) {
+async function main(argSrc, pagePrev=-1, storyPrev) {
   // runtime args
   const args = await config.loadArgs(argSrc)
 
@@ -794,14 +801,23 @@ async function main(argSrc, pagePrev=-1, storyPrev=-1) {
         let pageNumber = await resolvePageVar(args.page, pagePrev, args.index)
         if (pageNumber === Number.POSITIVE_INFINITY || pageNumber === Number.NEGATIVE_INFINITY) {
           throw new Error(
-            `page number %${pageNumber} is outside configured bounds for index ${args.index}`
+            `page number ${args.page} is outside configured bounds for index ${args.index}`
           )
         }
         indexPage = indexPages.get(args.index).get(pageNumber)
         args.page = Number(indexPage.pageNumber).toString()
 
         // resolve story variable
-        let storySummary = resolveStoryVar(args.story, storyPrev)
+        let storySummary = await resolveStoryVar(args.story, storyPrev, indexPage.filePath)
+        if (storySummary === Number.NEGATIVE_INFINITY) {
+          throw new Error(`story array index ${args.story} is less than 0`)
+        }
+        else if (storySummary === Number.POSITIVE_INFINITY) {
+          throw new Error(
+            `story array index ${args.story} is beyond the last story in page ${indexPage}; `
+            + `try next page ${pageNumber + 1}`
+          )
+        }
         args.story = storySummary.id
     
         // fetch story if selected
@@ -886,7 +902,9 @@ async function main(argSrc, pagePrev=-1, storyPrev=-1) {
   }
 
   // loop main
-  await getArgSrc().then(main)
+  await getArgSrc().then((argSrc) => {
+    return main(argSrc, (isNaN(args.page) ? undefined : parseInt(args.page)), args.story)
+  })
 }
 
 if (path.basename(process.argv[1]) === path.basename(import.meta.filename)) {
