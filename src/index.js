@@ -206,7 +206,7 @@ export async function resolvePageVar(pageOpt, pagePrev, indexName) {
   }
   else {
     // value of page option is not a variable
-    return parseInt(pageVar)
+    return parseInt(pageOpt)
   }
 }
 
@@ -803,11 +803,9 @@ async function main(argSrc, pagePrev=-1, storyPrev=-1) {
         // resolve story variable
         let storySummary = resolveStoryVar(args.story, storyPrev)
         args.story = storySummary.id
-        
-        console.log(`select index=${args.index} page=${args.page} story=${args.story}`)
     
         // fetch story if selected
-        storySummary = await reader.loadStory(indexPage.filePath, args.story)
+        console.log(`select index=${args.index} page=${args.page} story=${args.story}`)
         logger.info('fetch index=%s page-%s=[%s] story=%s', args.index, args.page, indexPage.filePath, args.story)
 
         const _excerptPath = getExcerptPath(args.profilesDir, args.index, args.story, storySummary.authorName, storySummary.title)
@@ -891,29 +889,30 @@ async function main(argSrc, pagePrev=-1, storyPrev=-1) {
   await getArgSrc().then(main)
 }
 
-// init
-init()
-// main
-.then(
-  async () => {
-    try {
-      await main()
-    }
-    catch (err) {
-      // this catch is not working for all cases of readling.question abort
-      if (err.code !== 'ABORT_ERR') {
-        throw err
+if (path.basename(process.argv[1]) === path.basename(import.meta.filename)) {
+  // init
+  init()
+  // main
+  .then(
+    async () => {
+      try {
+        await main()
       }
-      else {
-        // readline.question prompt was aborted; normal program exit.
-        process.exit()
+      catch (err) {
+        // this catch is not working for all cases of readling.question abort
+        if (err.code !== 'ABORT_ERR') {
+          throw err
+        }
+        else {
+          // readline.question prompt was aborted; normal program exit.
+          process.exit()
+        }
       }
+    },
+    (initErr) => {
+      throw new Error(`error during initialization`, {
+        cause: initErr
+      })
     }
-  },
-  (initErr) => {
-    throw new Error(`error during initialization`, {
-      cause: initErr
-    })
-  }
-)
-
+  )
+}

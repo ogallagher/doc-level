@@ -822,4 +822,8 @@ export class LibraryBook extends LibraryDescriptor {
     this.profile?.unsetTags()
     super.unsetTags()
   }
+
+  toString() {
+    return `LibraryBook[id=${this.story.id} title=${this.story.title}]`
+  }
 }

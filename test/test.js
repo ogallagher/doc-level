@@ -11,6 +11,7 @@ import { getTagLineageName, Library, LibraryBook, init as libraryInit, TYPE_TO_T
 import { IndexPage } from '../src/indexPage.js'
 import { StorySummary } from '../src/storySummary.js'
 import { LibraryDescriptor } from '../src/libraryDescriptor.js'
+import { resolvePageVar, resolveStoryVar } from '../src/index.js'
 
 const logger = pino(
   {
@@ -20,6 +21,7 @@ const logger = pino(
 )
 
 await libraryInit(logger)
+await storiesIndex.init(logger)
 
 describe('textProfile', function() {
   describe('#init', function() {
@@ -193,8 +195,6 @@ describe('storiesIndex', function() {
     let mji
 
     before(async function() {
-      await storiesIndex.init(logger)
-
       asi = new storiesIndex.StoriesIndex('https://host.tld', ['abstract0'])
       mji = storiesIndex.getStoriesIndex('문장웹진')
     })
@@ -495,6 +495,61 @@ describe('library', () => {
     it('are the only tagged entities', () => {
       [...rt._tagged_entities.keys()].forEach((ent) => {
         assert.ok(ent instanceof LibraryDescriptor)
+      })
+    })
+  })
+})
+
+describe ('entrypoint cli opts', () => {
+  describe('variable expressions', () => {
+    const index1 = new storiesIndex.StoriesIndex(
+      'https://host.tld', ['index1', 'i1'], 1, 5
+    )
+
+    describe('#resolvePageVar', () => {
+      it('handles both contained and spilled page numbers', async () => {
+        // first as 1 ignores previous
+        let pageNumber = await resolvePageVar('@first', -1, index1.name)
+        assert.strictEqual(pageNumber, index1.pageNumberMin)
+
+        // next as 0 is below min
+        pageNumber = await resolvePageVar('@next', -1, index1.name)
+        assert.strictEqual(pageNumber, Number.NEGATIVE_INFINITY)
+
+        // index is contained
+        pageNumber = await resolvePageVar('@1', -1, index1.name)
+        assert.strictEqual(pageNumber, await resolvePageVar('1', -5, index1.name))
+
+        // next as 6 is above max
+        pageNumber = await resolvePageVar('@next', 5, index1.name)
+        assert.strictEqual(pageNumber, Number.POSITIVE_INFINITY)
+      })
+    })
+
+    describe('#resolveStoryVar', () => {
+      it('handles both contained and spilled story array indexes', async () => {
+        const pageLength = 2
+        const pagePath = 'test/resource/stories/index1/page-1/index.json'
+        const storyIds = [
+          '142',
+          'restore2004_223748051577'
+        ]
+
+        // first ignores previous
+        let story = await resolveStoryVar('@first', -5, pagePath)
+        assert.strictEqual(story.id, storyIds[0])
+
+        // next as -1 is below min
+        story = await resolveStoryVar('@next', -2, pagePath)
+        assert.strictEqual(story, Number.NEGATIVE_INFINITY)
+
+        // index is contained
+        story = await resolveStoryVar('@1', pageLength * 10, pagePath)
+        assert.strictEqual(story.id, storyIds[1])
+
+        // next is above max
+        story = await resolveStoryVar('@next', pageLength-1, pagePath)
+        assert.strictEqual(story, Number.POSITIVE_INFINITY)
       })
     })
   })
