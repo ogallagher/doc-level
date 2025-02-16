@@ -5,7 +5,7 @@ import { RelationalTag as rt } from 'relational_tags'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
-import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml, reduceStory, loadProfile } from '../src/reader.js'
+import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml, reduceStory, loadProfile, getProfilePath } from '../src/reader.js'
 import * as storiesIndex from '../src/storiesIndex.js'
 import { getTagLineageName, Library, LibraryBook, init as libraryInit, TYPE_TO_TAG_CHILD } from '../src/library.js'
 import { IndexPage } from '../src/indexPage.js'
@@ -121,7 +121,8 @@ describe('reader', function() {
 
   describe('#loadProfile', function() {
     it('loads a profile when available', function() {
-      return loadProfile('142', 'test/resource/profiles')
+      return getProfilePath('142', 'test/resource/profiles')
+      .then(loadProfile)
       .then((profile) => {
         assert.ok(profile instanceof textProfile.TextProfile)
       })

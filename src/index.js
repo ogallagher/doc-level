@@ -18,8 +18,6 @@ import { IndexPage } from './indexPage.js'
 import { flushCliLogStream } from './pinoCliLogTransport.js'
 
 /**
- * @typedef {import('./storiesIndex.js').Story} Story
- *
  * @typedef {{
  *  destination: string,
  *  mkdir: boolean,
@@ -376,40 +374,21 @@ async function fetchLocalStory(localStoryPath, storiesDir) {
  * Fetch story summary and full text as list of fragments.
  * 
  * @param {string} storiesDir
- * @param {string[]} storyIndexPaths
- * @param {number} storyIndexPage
- * @param {string} storyIndexName
- * @param {string} storyId
+ * @param {StorySummary} story
+ * @param {number} indexPage
+ * @param {string} indexName
  *  
- * @returns {Promise<{storyText: string[], storySummary: StorySummary}>}
+ * @returns {Promise<string[]>}
  */
-async function fetchStory(storiesDir, storyIndexPath, storyIndexName, storyIndexPage, storyId) {
-  // load story summary from index page
-  const storySummary = await (
-    reader.loadText(storyIndexPath)
-    .then((indexJson) => {
-      /**
-       * @type {Story[]}
-       */
-      const stories = JSON.parse(indexJson).filter((story) => story.id === storyId)
-
-      if (stories.length === 1) {
-        return stories[0]
-      }
-      else {
-        throw new Error(`unable to load story id=${storyId} from ${storyIndexPath}`)
-      }
-    })
-  )
-
-  const storyIndex = si.getStoriesIndex(storyIndexName)
+async function fetchStory(storiesDir, story, indexName, indexPage) {
+  const storyIndex = si.getStoriesIndex(indexName)
 
   // check for existing local files to skip ahead
-  const tempDir = path.join(`data/temp/${storyIndexName}/page-${storyIndexPage}/story-${storyId}`)
-  const webpageFile = `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}${storyIndex.storyFileExt}`
+  const tempDir = path.join(`data/temp/${indexName}/page-${indexPage}/story-${story.id}`)
+  const webpageFile = `${fileString(story.authorName)}_${fileString(story.title)}${storyIndex.storyFileExt}`
   const storyFullTextPath = path.join(
-    storiesDir, storyIndexName, `story-${storyId}`, 
-    `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}.txt`
+    storiesDir, indexName, `story-${story.id}`, 
+    `${fileString(story.authorName)}_${fileString(story.title)}.txt`
   )
 
   let fullTextFileExists = await writer.fileExists(storyFullTextPath)
@@ -422,7 +401,7 @@ async function fetchStory(storiesDir, storyIndexPath, storyIndexName, storyIndex
     // download full story webpage to temp file
     await writer.initDir(tempDir)
     const storyWebpagePath = await writer.downloadWebpage(
-      new URL(storySummary.url), 
+      new URL(story.url), 
       path.join(tempDir, webpageFile),
       true
     )
@@ -436,7 +415,7 @@ async function fetchStory(storiesDir, storyIndexPath, storyIndexName, storyIndex
     
     await writer.initDir(path.dirname(storyFullTextPath))
 
-    let textGenerator = si.getStoriesIndex(storyIndexName).getStoryText(storyPage)
+    let textGenerator = si.getStoriesIndex(indexName).getStoryText(storyPage)
   
     /**
      * @type {string}
@@ -450,18 +429,25 @@ async function fetchStory(storiesDir, storyIndexPath, storyIndexName, storyIndex
     }
     storyFile.close()
     
-    logger.info('saved story=%s paragraph-count=%s to %s', storyId, storyText.length, storyFullTextPath)
+    logger.info('saved story=%s paragraph-count=%s to %s', story.id, storyText.length, storyFullTextPath)
   }
   else {
     logger.info('local full text exists at "%s"; load from local instead of download', storyFullTextPath)
     storyText = await reader.loadText(storyFullTextPath)
     .then((rawText) => rawText.split(/[\n\r]{2,}/))
     
-    logger.info('loaded story=%s paragraph-count=%s from %s', storyId, storyText.length, storyFullTextPath)
+    logger.info('loaded story=%s paragraph-count=%s from %s', story.id, storyText.length, storyFullTextPath)
   }
 
   
-  return { storyText, storySummary }
+  return storyText
+}
+
+function getExcerptPath(profilesDir, indexName, storyId, authorName, storyTitle) {
+  return path.join(
+    profilesDir, indexName, `story-${storyId}`, 
+    `${fileString(authorName)}_${fileString(storyTitle)}_excerpt.txt`
+  )
 }
 
 /**
@@ -470,22 +456,31 @@ async function fetchStory(storiesDir, storyIndexPath, storyIndexName, storyIndex
  * Method does not wait for the excerpt file to be created before return, since it's only for
  * user reference.
  * 
+ * If the local excerpt file already exists, it is loaded instead.
+ * 
  * @param {string[]} storyText 
  * @param {number} storyLengthMax 
  * @param {string} excerptPath 
  * @returns {Promise<string[]>} Story excerpt as list of fragments.
  */
 async function reduceStory(storyText, storyLengthMax, excerptPath) {
-  const excerpt = await reader.reduceStory(storyText, storyLengthMax)
-  logger.info('reduced story len=%s to excerpt len=%s', storyText.length, excerpt.length)
+  if (await writer.fileExists(excerptPath)) {
+    logger.info('load excerpt from existing local file path="%s"', excerptPath)
+    return (await reader.loadText(excerptPath)).split('\n')
+  }
+  else {
+    const excerpt = await reader.reduceStory(storyText, storyLengthMax)
+    logger.info('reduced story len=%s to excerpt len=%s', storyText.length, excerpt.length)
 
-  // save reduced excerpt to local file
-  writer.writeText(excerpt.join('\n'), excerptPath)
-  .then(() => {
-    logger.info('saved story excerpt to path=%s', excerptPath)
-  })
+    // save reduced excerpt to local file
+    writer.writeText(excerpt.join('\n'), excerptPath)
+    .then(() => {
+      logger.info('saved story excerpt to path="%s"', excerptPath)
+    })
 
-  return excerpt
+    return excerpt
+  }
+  
 }
 
 /**
@@ -493,65 +488,73 @@ async function reduceStory(storyText, storyLengthMax, excerptPath) {
  * 
  * @param {string} storyText 
  * @param {string} textPath 
+ * @param {boolean} replaceIfExists
  * @returns {Promise<reader.Context>}
  */
-async function createProfile(storyText, textPath) {
+async function createProfile(storyText, textPath, replaceIfExists) {
   const ctx = new reader.Context(storyText, new tp.TextProfile(), textPath)
 
-  let storyPrelude = storyText.substring(0, 20)
+  // check whether local profile file already exists
+  if (!replaceIfExists && await writer.fileExists(ctx.profile.filePath)) {
+    logger.info('load existing local profile from path="%s"', ctx.profile.filePath)
+    ctx.profile = new tp.TextProfile(await reader.loadProfile(ctx.profile.filePath))
+  }
+  else {
+    let storyPrelude = storyText.substring(0, 20)
 
-  await Promise.all([
-    new Promise((res) => {
-      logger.info('get maturity of %s...', storyPrelude)
+    await Promise.all([
+      new Promise((res) => {
+        logger.info('get maturity of %s...', storyPrelude)
 
-      reader.getMaturity(ctx)
-      .then((maturity) => {
-        ctx.profile.setMaturity(maturity)
-        logger.info('profile.maturity=%o', ctx.profile.maturity)
-        res()
+        reader.getMaturity(ctx)
+        .then((maturity) => {
+          ctx.profile.setMaturity(maturity)
+          logger.info('profile.maturity=%o', ctx.profile.maturity)
+          res()
+        })
+      }),
+      new Promise((res) => {
+        logger.info('get difficulty of %s...', storyPrelude)
+
+        reader.getDifficulty(ctx)
+        .then((difficulty) => {
+          ctx.profile.setDifficulty(difficulty)
+          logger.info('profile.difficulty=%o', ctx.profile.difficulty)
+          res()
+        })
+      }),
+      new Promise((res) => {
+        logger.info('get topics in %s...', storyPrelude)
+
+        reader.getTopics(ctx)
+        .then((topics) => {
+          ctx.profile.setTopics(topics)
+          logger.info('profile.topics=%o', ctx.profile.topics)
+          res()
+        })
+      }),
+      new Promise((res) => {
+        logger.info('get ideologies in %s...', storyPrelude)
+
+        reader.getIdeologies(ctx)
+        .then((ideologies) => {
+          ctx.profile.setIdeologies(ideologies)
+          logger.info('profile.ideologies=%o', ctx.profile.ideologies)
+          res()
+        })
       })
-    }),
-    new Promise((res) => {
-      logger.info('get difficulty of %s...', storyPrelude)
+    ])
 
-      reader.getDifficulty(ctx)
-      .then((difficulty) => {
-        ctx.profile.setDifficulty(difficulty)
-        logger.info('profile.difficulty=%o', ctx.profile.difficulty)
-        res()
-      })
-    }),
-    new Promise((res) => {
-      logger.info('get topics in %s...', storyPrelude)
+    logger.info('created profile for given textPath=%o', ctx.textPath)
 
-      reader.getTopics(ctx)
-      .then((topics) => {
-        ctx.profile.setTopics(topics)
-        logger.info('profile.topics=%o', ctx.profile.topics)
-        res()
-      })
-    }),
-    new Promise((res) => {
-      logger.info('get ideologies in %s...', storyPrelude)
-
-      reader.getIdeologies(ctx)
-      .then((ideologies) => {
-        ctx.profile.setIdeologies(ideologies)
-        logger.info('profile.ideologies=%o', ctx.profile.ideologies)
-        res()
-      })
-    })
-  ])
-
-  logger.info('created profile for given textPath=%o', ctx.textPath)
-
-  // save profile
-  logger.info('save profile to profilePath=%o', ctx.profile.filePath)
-  await writer.writeText(
-    JSON.stringify(ctx.profile, ctx.profile.getSerializable, 2),
-    ctx.profile.filePath
-  )
-  logger.info('saved profile')
+    // save profile
+    logger.info('save profile to profilePath="%o"', ctx.profile.filePath)
+    await writer.writeText(
+      JSON.stringify(ctx.profile, ctx.profile.getSerializable, 2),
+      ctx.profile.filePath
+    )
+    logger.info('saved profile')
+  }
 
   return ctx
 }
@@ -667,6 +670,12 @@ async function main(argSrc) {
    * @type {IndexPage|undefined}
    */
   let indexPage
+  /**
+   * Remains `undefined` until we confirm whether the excerpt file exists or we will create it.
+   * 
+   * @type {string|undefined}
+   */
+  let excerptPath
 
   // fetch story
   await new Promise(
@@ -674,33 +683,41 @@ async function main(argSrc) {
      * @param {function ({
      *  storyText: string[], 
      *  storySummary: StorySummary
-     * }|undefined)} res 
+     * }|undefined)} res
      */
-    (res) => {
+    async (res) => {
       if (args.story !== undefined) {
         // resolve index alias
         args.index = si.getStoriesIndex(args.index).name
     
         // fetch story if selected
         indexPage = indexPages.get(args.index).get(args.page)
-    
+        const storySummary = await reader.loadStory(indexPage.filePath, args.story)
         logger.info('fetch index=%s page-%s=[%s] story=%s', args.index, args.page, indexPage.filePath, args.story)
-        fetchStory(
-          args.storiesDir, indexPage.filePath, args.index, args.page, args.story
-        ).then(res)
+
+        const _excerptPath = getExcerptPath(args.profilesDir, args.index, args.story, storySummary.authorName, storySummary.title)
+        if (await writer.fileExists(_excerptPath)) {
+          logger.info('excerpt file already exists; skip full text')
+          excerptPath = _excerptPath
+          res({storySummary})
+        }
+        else {
+          res({
+            storySummary,
+            storyText: await fetchStory(args.storiesDir, storySummary, args.index, args.page)
+          })
+        }
       }
       else if (args.localStoryFile !== undefined) {
-        fetchLocalStory(args.localStoryFile, args.storiesDir)
-        .then((storyInfo) => {
-          // select local story for subsequent operations
-          args.index = storyInfo.indexPage.indexName
-          args.page = storyInfo.indexPage.pageNumber
-          args.story = storyInfo.storySummary.id
-          
-          indexPage = storyInfo.indexPage
+        let storyInfo = await fetchLocalStory(args.localStoryFile, args.storiesDir)
+        // select local story for subsequent operations
+        args.index = storyInfo.indexPage.indexName
+        args.page = storyInfo.indexPage.pageNumber
+        args.story = storyInfo.storySummary.id
+        
+        indexPage = storyInfo.indexPage
 
-          res(storyInfo)
-        })
+        res(storyInfo)
       }
       else {
         res()
@@ -723,16 +740,14 @@ async function main(argSrc) {
   }
 
   // reduce story
-  /**
-   * @type {string|undefined}
-   */
-  let excerptPath
-  if (storyText !== undefined) {
-    excerptPath = path.join(
-      args.profilesDir, args.index, `story-${args.story}`, 
-      `${fileString(storySummary.authorName)}_${fileString(storySummary.title)}_excerpt.txt`
-    )
-    await writer.initDir(path.dirname(excerptPath))
+  if (storyText !== undefined || excerptPath !== undefined) {
+    if (excerptPath === undefined) {
+      excerptPath = getExcerptPath(
+        args.profilesDir, args.index, args.story, storySummary.authorName, storySummary.title
+      )
+      await writer.initDir(path.dirname(excerptPath))
+    }
+    
     storyText = await reduceStory(storyText, args.storyLengthMax, excerptPath)
   }
   else {
@@ -742,8 +757,8 @@ async function main(argSrc) {
   // create story profile
   if (storyText !== undefined) {
     if (!args.skipProfile) {
-      const readerContext = await createProfile(storyText.join('\n'), excerptPath)
-      console.log(`created profile at ${readerContext.profile.filePath}`)
+      const readerContext = await createProfile(storyText.join('\n'), excerptPath, args.forceProfile)
+      console.log(`story-${args.story} profile at ${readerContext.profile.filePath}`)
 
       if (library !== undefined) {
         logger.info('add book profile for story %o to library', storySummary)
@@ -762,7 +777,7 @@ async function main(argSrc) {
 }
 
 // init
-await init()
+init()
 // main
 .then(
   async () => {

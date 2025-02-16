@@ -60,6 +60,11 @@ export const argParser = yargs()
   description: 'Max number of stories to fetch.',
   default: 10
 })
+.option('story', {
+  alias: 's',
+  type: 'string',
+  description: 'Identifier of a story to be loaded and profiled.'
+})
 .option('index', {
   alias: 'i',
   type: 'string',
@@ -73,16 +78,17 @@ export const argParser = yargs()
   description: 'Page number within stories index.',
   default: 1
 })
-.option('story', {
-  alias: 's',
-  type: 'string',
-  description: 'Story id.'
-})
 .option('story-length-max', {
   alias: 'n',
   type: 'number',
   description: 'Max character length of story text to include when generating its profile.',
   default: 3500
+})
+.option('force-profile', {
+  alias: 'P',
+  type: 'boolean',
+  default: false,
+  description: 'Even if a profile for the selected story exists, generate a new one to replace it.'
 })
 .option('skip-profile', {
   alias: '0',
@@ -188,6 +194,7 @@ argParser.wrap(argParser.terminalWidth())
  *  localStoryFile: string | undefined,
  *  storyLengthMax: number,
  *  skipProfile: boolean,
+ *  forceProfile: boolean,
  *  showLibrary: string | undefined,
  *  rendersDir: string,
  *  reload: boolean,

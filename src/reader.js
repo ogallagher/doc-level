@@ -699,40 +699,65 @@ export function listFiles(dir, pattern) {
 }
 
 /**
+ * Load a story from a local index page.
+ * 
+ * @returns {Promise<StorySummary>}
+ */
+export function loadStory(storyIndexPath, storyId) {
+  // load story summary from index page
+  return loadText(storyIndexPath)
+  .then((indexJson) => {
+    /**
+     * @type {StorySummary[]}
+     */
+    const stories = JSON.parse(indexJson).filter((story) => story.id === storyId)
+
+    if (stories.length === 1) {
+      return stories[0]
+    }
+    else {
+      throw new Error(`unable to load story id=${storyId} from ${storyIndexPath}`)
+    }
+  })
+}
+
+/**
  * 
  * @param {string} storyId 
  * @param {string} profilesDir
  * 
- * @returns {Promise<TextProfile>}
+ * @returns {Promise<string>}
  */
-export function loadProfile(storyId, profilesDir) {
+export async function getProfilePath(storyId, profilesDir) {
   const profilePattern = new RegExp(regexpEscape(`story-${storyId}`) + '/.+profile.json$')
   logger.debug('story %s profile search pattern=%s', storyId, profilePattern)
 
-  /**
-   * @type {string}
-   */
-  let storyPath
+  const storyPaths = await listFiles(profilesDir, profilePattern)
+  if (storyPaths.length !== 1) {
+    throw new Error(`unable to find profile for story ${storyId} at ${profilesDir}`, {
+      cause: {
+        candidatePaths: storyPaths
+      }
+    })
+  }
 
-  return listFiles(profilesDir, profilePattern)
-  .then((storyPaths) => {
-    if (storyPaths.length !== 1) {
-      throw new Error(`unable to find profile for story ${storyId} at ${profilesDir}`, {
-        cause: {
-          candidatePaths: storyPaths
-        }
-      })
-    }
-    storyPath = storyPaths[0]
-    return storyPath
-  })
-  .then(loadText)
+  return storyPaths[0]
+}
+
+/**
+ * 
+ * @param {string} profilePath
+ * 
+ * @returns {Promise<TextProfile>}
+ */
+export function loadProfile(profilePath) {
+  return loadText(profilePath)
   .then(JSON.parse)
   .then((profileData) => {
     let profile = new TextProfile(profileData)
 
     if (profile.filePath === undefined) {
-      profile.filePath = storyPath
+      profile.filePath = profilePath
     }
 
     return profile

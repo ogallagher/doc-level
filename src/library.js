@@ -4,7 +4,7 @@ import { Difficulty, Ideology, Maturity, TextProfile, Topic } from './textProfil
 import { StoriesIndex, getStoriesIndex } from './storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
-import { loadText, loadProfile } from './reader.js'
+import { loadText, loadProfile, getProfilePath } from './reader.js'
 import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX } from './config.js'
 /**
  * @typedef {import('pino').Logger} Logger
@@ -132,7 +132,7 @@ export async function getLibrary(indexPages, profilesDir) {
            */
           let profile
           try {
-            profile = await loadProfile(story.id, profilesDir)
+            profile = await getProfilePath(story.id, profilesDir).then(loadProfile)
           }
           catch (err) {
             logger.debug('no profile found for story=%s', story.id)
