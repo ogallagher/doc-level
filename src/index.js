@@ -160,6 +160,98 @@ function getArgSrc() {
   })
 }
 
+/**
+ * @param {string} pageOpt 
+ * @param {number} pagePrev 
+ * @param {string} index
+ * 
+ * @returns {Promise<number>} Page numbre, or `+/-infinity` if the requested page number is beyond
+ * the bounds of the current stories index.
+ */
+export async function resolvePageVar(pageOpt, pagePrev, indexName) {
+  if (pageOpt.startsWith(config.OPT_VAR_PREFIX)) {
+    const pageVar = pageOpt.substring(config.OPT_VAR_PREFIX.length)
+    const index = si.getStoriesIndex(indexName)
+
+    if (pageVar === config.OPT_VAR_FIRST) {
+      return index.pageNumberMin
+    }
+    else if (pageVar === config.OPT_VAR_NEXT) {
+      if (pagePrev+1 > index.pageNumberMax) {
+        logger.info(
+          'page number %s is beyond max %s of index %s', pagePrev+1, index.pageNumberMax, indexName
+        )
+        return Number.POSITIVE_INFINITY
+      }
+      else if (pagePrev+1 < index.pageNumberMin) {
+        logger.info(
+          'page number %s is below min %s of index %s', pagePrev+1, index.pageNumberMin, indexName
+        )
+        return Number.NEGATIVE_INFINITY
+      }
+      else {
+        return pagePrev + 1
+      }
+    }
+    else if (typeof pageVar === 'number') {
+      logger.warn(
+        'specifying page number %s as variable expression @<page-number> is not as efficient as literal <page-number>',
+        pageVar
+      )
+      return parseInt(pageVar)
+    }
+    else {
+      throw new Error(`invalid page variable ${pageOpt}`)
+    }
+  }
+  else {
+    // value of page option is not a variable
+    return parseInt(pageVar)
+  }
+}
+
+/**
+ * @param {string} storyOpt 
+ * @param {number} storyPrev 
+ * @param {string} pagePath
+ * 
+ * @returns {Promise<StorySummary|number>} The story if within the bounds of the page, or `+/-infinity` if
+ * story array index is beyond the bounds of the current page.
+ */
+export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
+  if (storyOpt.startsWith(config.OPT_VAR_PREFIX)) {
+    const storyVar = storyOpt.substring(config.OPT_VAR_PREFIX.length)
+    const stories = await reader.loadStories(pagePath)
+
+    if (storyVar === config.OPT_VAR_FIRST) {
+      return stories[0]
+    }
+    else if (storyVar === config.OPT_VAR_NEXT) {
+      if (storyPrev+1 >= stories.length) {
+        logger.info(
+          'story array index %s is beyond length=%s of page %s', storyPrev+1, stories.length, pagePath
+        )
+        return Number.POSITIVE_INFINITY
+      }
+      else if (storyPrev+1 < 0) {
+        return Number.NEGATIVE_INFINITY
+      }
+      else {
+        const story = stories[storyPrev + 1]
+        logger.debug('story id var=%s resolved to %s', storyOpt, story.id)
+        return story
+      }
+    }
+    else {
+      throw new Error(`invalid story variable ${storyOpt}`)
+    }
+  }
+  else {
+    // value of story option is not a variable
+    return storyOpt
+  }
+}
+
 function fetchStorySummaries(storiesIndex, storiesMax, storiesDir) {
   // fetch stories from requested index
   return reader.fetchStories(storiesIndex, storiesMax, storiesDir)

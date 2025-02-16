@@ -16,6 +16,10 @@ const ENV_KEY_OPENAI_API_KEY = 'OPENAI_API_KEY'
 const ENV_KEY_READING_DIFFICULTY_WORDS_MAX = 'READING_DIFFICULTY_WORDS_MAX'
 const ENV_KEY_READING_DIFFICULTY_PHRASES_MAX = 'READING_DIFFICULTY_PHRASES_MAX'
 
+export const OPT_VAR_PREFIX = '@'
+export const OPT_VAR_FIRST = 'first'
+export const OPT_VAR_NEXT = 'next'
+
 const OpenAIChatModel = {
   GPT_4: 'gpt-4o',
   GPT_4_MINI: 'gpt-4o-mini'
@@ -41,139 +45,141 @@ export const SEARCH_TAG_BOOKS_MAX = 50
  */
 let logger
 
-export const argParser = yargs()
-.option('fetch-stories-index', {
-  alias: 'f',
-  type: 'string',
-  description: 'Fetch stories from a registered index/listing webpage.',
-  // choices are unknown until indexes are initialized
-  choices: undefined
-})
-.option('local-story-file', {
-  alias: 'F',
-  type: 'string',
-  description: 'Load an isolated story from a local full text file path.'
-})
-.option('fetch-stories-max', {
-  alias: 'm',
-  type: 'number',
-  description: 'Max number of stories to fetch.',
-  default: 10
-})
-.option('story', {
-  alias: 's',
-  type: 'string',
-  description: 'Identifier of a story to be loaded and profiled.'
-})
-.option('index', {
-  alias: 'i',
-  type: 'string',
-  description: 'Stories index/listing name.',
-  // choices are unknown until indexes are initialized
-  choices: undefined
-})
-.option('page', {
-  alias: 'p',
-  type: 'number',
-  description: 'Page number within stories index.',
-  default: 1
-})
-.option('story-length-max', {
-  alias: 'n',
-  type: 'number',
-  description: 'Max character length of story text to include when generating its profile.',
-  default: 3500
-})
-.option('force-profile', {
-  alias: 'P',
-  type: 'boolean',
-  default: false,
-  description: 'Even if a profile for the selected story exists, generate a new one to replace it.'
-})
-.option('skip-profile', {
-  alias: '0',
-  type: 'boolean',
-  description: 'Even if a story is selected, do not generate a profile for it.'
-})
-.option('show-library', {
-  alias: 'L',
-  type: 'string',
-  description: (
-    'Show library (fetched stories, profiles, indexes, etc). Combine with other opts to only '
-    + 'show a subset of items.\n'
-    + '- tag = Print flat list of all available tags for searching. Filters are not applied.\n'
-    + '- txt = Print flat list of books to a plain text file.\n'
-    + '- md = [pending] Render as a markdown file.\n'
-    + '- html = [pending] Render as a local webpage.'
-  ),
-  choices: ['tag', 'txt', 'md', 'html']
-})
-.option('tag', {
-  alias: 't',
-  type: 'string',
-  description: 'Tag name for limiting library items.'
-})
-.option('query', {
-  alias: 'q',
-  type: 'string',
-  description: (
-    'Query string for limiting library items by tag pattern. '
-    + 'Surround with slashes like /\\w+e/ to search using a regular expression. Note that currently '
-    + 'the regexp must match the whole tag name, not a substring.'
-  )
-})
-.option('sort', {
-  alias: '>',
-  type: 'string',
-  choices: ['asc', 'desc'],
-  default: 'asc',
-  description: (
-    'Sort direction of search results. \n'
-    + 'Ex. "-t years-of-education -> asc" will sort easiest texts first.'
-  )
-})
-.option('stories-dir', {
-  alias: 'd',
-  type: 'string',
-  description: 'Local filesystem directory where story lists and texts are saved.',
-  default: path.join('data', 'stories')
-})
-.option('profiles-dir', {
-  alias: 'D',
-  type: 'string',
-  description: 'Local directory where story profiles are saved.',
-  default: path.join('data', 'profiles')
-})
-.option('renders-dir', {
-  alias: 'e',
-  type: 'string',
-  description: 'Local directory where library renderings/exports are saved.',
-  default: path.join('data', 'renders')
-})
-.option('reload', {
-  alias: 'r',
-  type: 'boolean',
-  description: (
-    'Whether to reload library objects from the filesystem. '
-    + 'Not usually necessary unless files were changed manually.'
-  ),
-  default: false
-})
-.option('log-level', {
-  alias: 'l',
-  type: 'string',
-  description: '[pending; does not work yet] set log level',
-  default: 'info',
-  choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']
-})
-.alias('v', 'version')
-.option('help', {
-  alias: 'h',
-  type: 'boolean',
-  default: false
-})
-.alias('h', 'help')
-.help(false)
+export const argParser = (
+  yargs()
+  .option('fetch-stories-index', {
+    alias: 'f',
+    type: 'string',
+    description: 'Fetch stories from a registered index/listing webpage.',
+    // choices are unknown until indexes are initialized
+    choices: undefined
+  })
+  .option('local-story-file', {
+    alias: 'F',
+    type: 'string',
+    description: 'Load an isolated story from a local full text file path.'
+  })
+  .option('fetch-stories-max', {
+    alias: 'm',
+    type: 'number',
+    description: 'Max number of stories to fetch.',
+    default: 10
+  })
+  .option('story', {
+    alias: 's',
+    type: 'string',
+    description: 'Identifier of a story to be loaded and profiled.'
+  })
+  .option('index', {
+    alias: 'i',
+    type: 'string',
+    description: 'Stories index/listing name.',
+    // choices are unknown until indexes are initialized
+    choices: undefined
+  })
+  .option('page', {
+    alias: 'p',
+    type: 'string',
+    description: 'Page number within stories index.',
+    default: `${OPT_VAR_PREFIX}${OPT_VAR_FIRST}`
+  })
+  .option('story-length-max', {
+    alias: 'n',
+    type: 'number',
+    description: 'Max character length of story text to include when generating its profile.',
+    default: 3500
+  })
+  .option('force-profile', {
+    alias: 'P',
+    type: 'boolean',
+    default: false,
+    description: 'Even if a profile for the selected story exists, generate a new one to replace it.'
+  })
+  .option('skip-profile', {
+    alias: '0',
+    type: 'boolean',
+    description: 'Even if a story is selected, do not generate a profile for it.'
+  })
+  .option('show-library', {
+    alias: 'L',
+    type: 'string',
+    description: (
+      'Show library (fetched stories, profiles, indexes, etc). Combine with other opts to only '
+      + 'show a subset of items.\n'
+      + '- tag = Print flat list of all available tags for searching. Filters are not applied.\n'
+      + '- txt = Print flat list of books to a plain text file.\n'
+      + '- md = [pending] Render as a markdown file.\n'
+      + '- html = [pending] Render as a local webpage.'
+    ),
+    choices: ['tag', 'txt', 'md', 'html']
+  })
+  .option('tag', {
+    alias: 't',
+    type: 'string',
+    description: 'Tag name for limiting library items.'
+  })
+  .option('query', {
+    alias: 'q',
+    type: 'string',
+    description: (
+      'Query string for limiting library items by tag pattern. '
+      + 'Surround with slashes like /\\w+e/ to search using a regular expression. Note that currently '
+      + 'the regexp must match the whole tag name, not a substring.'
+    )
+  })
+  .option('sort', {
+    alias: '>',
+    type: 'string',
+    choices: ['asc', 'desc'],
+    default: 'asc',
+    description: (
+      'Sort direction of search results. \n'
+      + 'Ex. "-t years-of-education -> asc" will sort easiest texts first.'
+    )
+  })
+  .option('stories-dir', {
+    alias: 'd',
+    type: 'string',
+    description: 'Local filesystem directory where story lists and texts are saved.',
+    default: path.join('data', 'stories')
+  })
+  .option('profiles-dir', {
+    alias: 'D',
+    type: 'string',
+    description: 'Local directory where story profiles are saved.',
+    default: path.join('data', 'profiles')
+  })
+  .option('renders-dir', {
+    alias: 'e',
+    type: 'string',
+    description: 'Local directory where library renderings/exports are saved.',
+    default: path.join('data', 'renders')
+  })
+  .option('reload', {
+    alias: 'r',
+    type: 'boolean',
+    description: (
+      'Whether to reload library objects from the filesystem. '
+      + 'Not usually necessary unless files were changed manually.'
+    ),
+    default: false
+  })
+  .option('log-level', {
+    alias: 'l',
+    type: 'string',
+    description: '[pending; does not work yet] set log level',
+    default: 'info',
+    choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']
+  })
+  .alias('v', 'version')
+  .option('help', {
+    alias: 'h',
+    type: 'boolean',
+    default: false
+  })
+  .alias('h', 'help')
+  .help(false)
+)
 
 argParser.wrap(argParser.terminalWidth())
 
@@ -189,7 +195,7 @@ argParser.wrap(argParser.terminalWidth())
  *  storiesDir: string,
  *  profilesDir: string,
  *  index: string,
- *  page: number,
+ *  page: string,
  *  story: string | undefined,
  *  localStoryFile: string | undefined,
  *  storyLengthMax: number,

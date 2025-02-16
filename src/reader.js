@@ -699,26 +699,30 @@ export function listFiles(dir, pattern) {
 }
 
 /**
+ * Load stories from a local index page.
+ * 
+ * @param {string} pagePath 
+ * @returns {Promise<StorySummary[]>}
+ */
+export function loadStories(pagePath) {
+  return loadText(pagePath).then(JSON.parse)
+}
+
+/**
  * Load a story from a local index page.
  * 
  * @returns {Promise<StorySummary>}
  */
-export function loadStory(storyIndexPath, storyId) {
+export async function loadStory(pagePath, storyId) {
   // load story summary from index page
-  return loadText(storyIndexPath)
-  .then((indexJson) => {
-    /**
-     * @type {StorySummary[]}
-     */
-    const stories = JSON.parse(indexJson).filter((story) => story.id === storyId)
+  const stories = (await loadStories(pagePath)).filter((story) => story.id === storyId)
 
-    if (stories.length === 1) {
-      return stories[0]
-    }
-    else {
-      throw new Error(`unable to load story id=${storyId} from ${storyIndexPath}`)
-    }
-  })
+  if (stories.length === 1) {
+    return stories[0]
+  }
+  else {
+    throw new Error(`unable to load story id=${storyId} from ${pagePath}`)
+  }
 }
 
 /**
@@ -765,6 +769,8 @@ export function loadProfile(profilePath) {
 }
 
 /**
+ * Load an existing index page, or create a new one.
+ * 
  * @param {string} indexName 
  * @param {number} pageNumber 
  * @param {string} storiesDir 
@@ -785,7 +791,7 @@ export async function getIndexPage(indexName, pageNumber, storiesDir) {
     await fsAccess(page.filePath, fsConstants.F_OK)
     logger.debug('found existing page %o', page)
 
-    stories = await loadText(page.filePath).then(JSON.parse)
+    stories = await loadStories(page.filePath)
   }
   catch {
     logger.info('create new page %o', page)
