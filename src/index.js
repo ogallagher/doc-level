@@ -193,7 +193,7 @@ export async function resolvePageVar(pageOpt, pagePrev, indexName) {
         return pagePrev + 1
       }
     }
-    else if (typeof pageVar === 'number') {
+    else if (!isNaN(pageVar)) {
       logger.warn(
         'specifying page number %s as variable expression @<page-number> is not as efficient as literal <page-number>',
         pageVar
@@ -222,28 +222,34 @@ export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
   if (storyOpt.startsWith(config.OPT_VAR_PREFIX)) {
     const storyVar = storyOpt.substring(config.OPT_VAR_PREFIX.length)
     const stories = await reader.loadStories(pagePath)
+    let storyArrayIndex
 
     if (storyVar === config.OPT_VAR_FIRST) {
       return stories[0]
     }
     else if (storyVar === config.OPT_VAR_NEXT) {
-      if (storyPrev+1 >= stories.length) {
-        logger.info(
-          'story array index %s is beyond length=%s of page %s', storyPrev+1, stories.length, pagePath
-        )
-        return Number.POSITIVE_INFINITY
-      }
-      else if (storyPrev+1 < 0) {
-        return Number.NEGATIVE_INFINITY
-      }
-      else {
-        const story = stories[storyPrev + 1]
-        logger.debug('story id var=%s resolved to %s', storyOpt, story.id)
-        return story
-      }
+      storyArrayIndex = storyPrev + 1
+    }
+    else if (!isNaN(storyVar)) {
+      storyArrayIndex = parseInt(storyVar)
     }
     else {
       throw new Error(`invalid story variable ${storyOpt}`)
+    }
+
+    if (storyArrayIndex >= stories.length) {
+      logger.info(
+        'story array index %s is beyond length=%s of page %s', storyArrayIndex, stories.length, pagePath
+      )
+      return Number.POSITIVE_INFINITY
+    }
+    else if (storyArrayIndex < 0) {
+      return Number.NEGATIVE_INFINITY
+    }
+    else {
+      const story = stories[storyArrayIndex]
+      logger.debug('story id var=%s resolved to %s', storyOpt, story.id)
+      return story
     }
   }
   else {
@@ -655,10 +661,12 @@ async function createProfile(storyText, textPath, replaceIfExists) {
  * Looping program execution.
  * 
  * @param {string|undefined} argSrc
+ * @param {number} pagePrev Previous stories index page number.
+ * @param {number} storyPrev Previous story array index.
  * 
  * @returns {Promise<string>}
  */
-async function main(argSrc) {
+async function main(argSrc, pagePrev=-1, storyPrev=-1) {
   // runtime args
   const args = await config.loadArgs(argSrc)
 
@@ -781,10 +789,25 @@ async function main(argSrc) {
       if (args.story !== undefined) {
         // resolve index alias
         args.index = si.getStoriesIndex(args.index).name
+
+        // resolve page variable
+        let pageNumber = await resolvePageVar(args.page, pagePrev, args.index)
+        if (pageNumber === Number.POSITIVE_INFINITY || pageNumber === Number.NEGATIVE_INFINITY) {
+          throw new Error(
+            `page number %${pageNumber} is outside configured bounds for index ${args.index}`
+          )
+        }
+        indexPage = indexPages.get(args.index).get(pageNumber)
+        args.page = Number(indexPage.pageNumber).toString()
+
+        // resolve story variable
+        let storySummary = resolveStoryVar(args.story, storyPrev)
+        args.story = storySummary.id
+        
+        console.log(`select index=${args.index} page=${args.page} story=${args.story}`)
     
         // fetch story if selected
-        indexPage = indexPages.get(args.index).get(args.page)
-        const storySummary = await reader.loadStory(indexPage.filePath, args.story)
+        storySummary = await reader.loadStory(indexPage.filePath, args.story)
         logger.info('fetch index=%s page-%s=[%s] story=%s', args.index, args.page, indexPage.filePath, args.story)
 
         const _excerptPath = getExcerptPath(args.profilesDir, args.index, args.story, storySummary.authorName, storySummary.title)
