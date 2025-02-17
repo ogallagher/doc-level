@@ -703,10 +703,11 @@ export class LibraryBook extends LibraryDescriptor {
   /**
    * @param {LibraryDescriptor} parent
    * @param {StorySummary} story 
-   * @param {IndexPage} indexPage 
+   * @param {IndexPage} indexPageProto Reference to an index page from which an instance is cloned
+   * and adopted by this book.
    * @param {TextProfile|undefined} profile 
    */
-  constructor(parent, story, indexPage, profile) {
+  constructor(parent, story, indexPageProto, profile) {
     super(parent)
 
     /**
@@ -718,15 +719,15 @@ export class LibraryBook extends LibraryDescriptor {
     /**
      * @type {IndexPage}
      */
-    this.indexPage = indexPage
+    this.indexPage = IndexPage.fromData(indexPageProto)
     this.indexPage.setParent(this)
 
     /**
      * @type {StoriesIndex}
      */
-    this.index = getStoriesIndex(indexPage.indexName)
+    this.index = getStoriesIndex(indexPageProto.indexName)
     // Indexes do not have separate instances for each book, so they belong directly to the library.
-    // TODO To determine books associated with an index, the name should reference the indexPage within a book.
+    // To determine books associated with an index, the name should reference the indexPage within a book.
     this.index.setParent(parent)
 
     /**

@@ -10,9 +10,13 @@ export class IndexPage extends LibraryDescriptor {
   static get tPageFileName() {return RelationalTag.new('page-filename') }
 
   /**
-   * @param {string} indexName
-   * @param {string|number} pageNumber
-   * @param {string|undefined} filePath
+   * Reference to a page within a stories index. 
+   * 
+   * Every book will have it's own index page instance.
+   * 
+   * @param {string} indexName Name of {@link StoriesIndex index}.
+   * @param {string|number} pageNumber Page number.
+   * @param {string|undefined} filePath Path to page file having a list of story summaries.
    * @param {string|undefined} storiesDir Used to derive file path if `filePath` is not provided.
    */
   constructor(indexName, pageNumber, filePath, storiesDir) {
