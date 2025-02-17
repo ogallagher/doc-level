@@ -84,7 +84,7 @@ export const argParser = (
     alias: 'p',
     type: 'string',
     description: (
-      'Page number within stories index. '
+      'Page number within stories index. If combined with -f, provides page from which to start fetch. '
       + `Accepts variable expressions ${OPT_VAR_PREFIX}${OPT_VAR_FIRST}, ${OPT_VAR_PREFIX}${OPT_VAR_NEXT}.`
     ),
     default: `${OPT_VAR_PREFIX}${OPT_VAR_FIRST}`

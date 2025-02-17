@@ -1309,7 +1309,7 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 | `-m, --fetch-stories-max` | Max number of stories to fetch. | `-f` |
 | `-s, --story` | Identifier of a story to be loaded and profiled. | |
 | `-i, --index` | Stories index/listing name. | `-s` |
-| `-p, --page` | Page number within stories index. | `-s` |
+| `-p, --page` | Page number within stories index. If combined with `-f`, provides page from which to start fetch. | `-s` or `-f` |
 | `-n, --story-length-max` | Max character length of story text to include when generating its profile. | `-s` |
 | `-P, --force-profile` | Even if a profile for the selected story exists, generate a new one to replace it. | `-s` |
 | `-0, --skip-profile` | Even if a story is selected, do not generate a profile for it. | `-s` |
@@ -1326,7 +1326,7 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 
 For `--story`, instead of providing a story id, you can also use variable expressions `@first` for the first story in the page, `@next` for the next story in the page, or `@<array-index>` for the story at a given index within the page stories array. `@first` and `@0` are equivalent.
 
-Similarly for `--page`, instead of providing a page number, you can also use variable expressions `@first` for the first page in the stories index, or `@next` for the next page.
+Similarly for `--page`, instead of providing a page number, you can also use variable expressions `@first` for the first page in the stories index, or `@next` for the next page. If used with `-f`, then `@next` is **the next page after the last** one already in the local filesystem, instead of the next after the most recently used page.
 
 # Development
 
