@@ -590,7 +590,7 @@ export async function main(argSrc, pagePrev = -1, storyPrev, cycle=true) {
       logger.info('load library from filesystem')
 
       if (indexPages === undefined) {
-        indexPages = await fetchStoryIndexPages(args.storiesDir)
+        indexPages = await reader.listStoryIndexPages(args.storiesDir)
       }
 
       library = await lib.getLibrary(

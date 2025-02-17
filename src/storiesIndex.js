@@ -288,9 +288,8 @@ export class MunjangStoriesIndex extends StoriesIndex {
     '#contents > section.view_section .detail_cont > .page_group > .page_breaking'
   )
   static selectorTextParagraphs = [
-    'p.p1',
-    'blockquote',
-    'p > span'
+    'p',
+    'blockquote'
   ].join(',')
 
   constructor() {
