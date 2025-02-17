@@ -219,14 +219,18 @@ export function loadPrompt(templatePath, ...args) {
  * Fetch story summaries from an index/listing online.
  * 
  * @param {StoriesIndex} storiesIndex 
+ * @param {number|undefined} startPage
  * @param {number} storiesMax Max count of stories to fetch. Note the actual count of stories returned
  * will be rounded up to nearest whole page.
  * @param {string} storiesParentDir 
  * @returns {Promise<Map<number, StorySummary[]>>} Paged list of stories.
  */
-export function fetchStories(storiesIndex, storiesMax, storiesParentDir) {
-  logger.info('fetch up to %s stories from %s and save to %s', storiesMax, storiesIndex, storiesParentDir)
-  let pageNumber = storiesIndex.pageNumberMin
+export function fetchStories(storiesIndex, startPage, storiesMax, storiesParentDir) {
+  let pageNumber = startPage === undefined ? storiesIndex.pageNumberMin : startPage
+  logger.info(
+    'fetch up to %s stories from %s as of page %s and save to %s', 
+    storiesMax, storiesIndex, pageNumber, storiesParentDir
+  )
   let storiesCount = 0
   /**
    * @type {Map<number, StorySummary[]>}

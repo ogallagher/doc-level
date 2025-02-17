@@ -69,10 +69,11 @@ function getArgSrc() {
 
 /**
  * @param {string} pageOpt 
- * @param {number} pagePrev 
+ * @param {number|undefined} pagePrev Previous page number. `undefined` or `-infinity` means there was no
+ * previous page, so next is same as first.
  * @param {string} index
  * 
- * @returns {Promise<number>} Page numbre, or `+/-infinity` if the requested page number is beyond
+ * @returns {Promise<number>} Page number, or `+/-infinity` if the requested page number is beyond
  * the bounds of the current stories index.
  */
 export async function resolvePageVar(pageOpt, pagePrev, indexName) {
@@ -84,7 +85,11 @@ export async function resolvePageVar(pageOpt, pagePrev, indexName) {
       return index.pageNumberMin
     }
     else if (pageVar === config.OPT_VAR_NEXT) {
-      if (pagePrev + 1 > index.pageNumberMax) {
+      if (pagePrev === Number.NEGATIVE_INFINITY || pagePrev === undefined) {
+        logger.info('page %s without previous equals %s', config.OPT_VAR_NEXT, config.OPT_VAR_FIRST)
+        return index.pageNumberMin
+      }
+      else if (pagePrev + 1 > index.pageNumberMax) {
         logger.info(
           'page number %s is beyond max %s of index %s', pagePrev + 1, index.pageNumberMax, indexName
         )
@@ -172,12 +177,33 @@ export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
   }
 }
 
-function fetchStorySummaries(storiesIndex, storiesMax, storiesDir) {
+/**
+ * @param {si.StoriesIndex} index 
+ * @param {string} startPage
+ * @param {number} storiesMax 
+ * @param {string} storiesDir 
+ * 
+ * @returns {Promise<Map<number, StorySummary[]>>}
+ */
+async function fetchStorySummaries(index, startPage, storiesMax, storiesDir) {
+  // @next in this context refers to last+1 instead of previous+1
+  // Math.max returns -infinity if no local pages exist
+  const lastPageNumber = Math.max(
+    ...(await reader.listStoryIndexPages(storiesDir, index.name)).get(index.name).keys()
+  )
+  const pageNumber = await resolvePageVar(startPage, lastPageNumber, index.name)
+
   // fetch stories from requested index
-  return reader.fetchStories(storiesIndex, storiesMax, storiesDir)
-    .then((pagedStories) => {
-      logger.info('fetched %s pages of stories from %s', pagedStories.size, storiesIndex)
-    })
+  
+  const pagedStories = await reader.fetchStories(
+    index, 
+    pageNumber, 
+    storiesMax, 
+    storiesDir
+  )
+  
+  logger.info('fetched %s pages of stories from %s', pagedStories.size, index.name)
+  return pagedStories
 }
 
 /**
@@ -527,13 +553,13 @@ async function createProfile(storyText, textPath, replaceIfExists) {
  * 
  * @param {string|string[]|undefined} argSrc Source of user input arguments. Taken from `process.argv` if not 
  * defined.
- * @param {number} pagePrev Previous stories index page number.
+ * @param {number|undefined} pagePrev Previous stories index page number.
  * @param {string|undefined} storyPrev Previous story id.
  * @param {boolean} cycle Whether loop execution, prompting for user input.
  * 
  * @returns {Promise<undefined>}
  */
-export async function main(argSrc, pagePrev = -1, storyPrev, cycle=true) {
+export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   // runtime args
   const args = await config.loadArgs(argSrc)
 
@@ -558,6 +584,7 @@ export async function main(argSrc, pagePrev = -1, storyPrev, cycle=true) {
   if (args.fetchStoriesIndex !== undefined && !args.autopilot) {
     await fetchStorySummaries(
       si.getStoriesIndex(args.fetchStoriesIndex),
+      args.page,
       args.fetchStoriesMax,
       args.storiesDir
     )

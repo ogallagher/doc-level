@@ -537,27 +537,27 @@ describe ('entrypoint cli opts', () => {
         ]
 
         // first ignores previous
-        let story = await resolveStoryVar('@first', 'missing', pagePath)
+        let story = (await resolveStoryVar('@first', 'missing', pagePath)).story
         assert.strictEqual(story.id, storyIds[0])
 
         // next as 0 is contained
-        story = await resolveStoryVar('@next', 'missing', pagePath)
+        story = (await resolveStoryVar('@next', 'missing', pagePath)).story
         assert.strictEqual(story.id, storyIds[0])
 
         // index -1 is below min
-        story = await resolveStoryVar('@-1', 'missing', pagePath)
+        story = (await resolveStoryVar('@-1', 'missing', pagePath)).story
         assert.strictEqual(story, Number.NEGATIVE_INFINITY)
 
         // index is contained
-        story = await resolveStoryVar('@1', pageLength * 10, pagePath)
+        story = (await resolveStoryVar('@1', pageLength * 10, pagePath)).story
         assert.strictEqual(story.id, storyIds[1])
 
         // next is contained
-        story = await resolveStoryVar('@next', '142', pagePath)
+        story = (await resolveStoryVar('@next', '142', pagePath)).story
         assert.strictEqual(story.id, storyIds[1])
 
         // next is above max
-        story = await resolveStoryVar('@next', storyIds[1], pagePath)
+        story = (await resolveStoryVar('@next', storyIds[1], pagePath)).story
         assert.strictEqual(story, Number.POSITIVE_INFINITY)
       })
     })

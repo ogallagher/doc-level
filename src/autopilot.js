@@ -66,7 +66,8 @@ export async function autopilot(args, storyArrayIndex) {
   await main(
     [
       '--fetch-stories-index', args.index,
-      '--fetch-stories-max', args.fetchStoriesMax
+      '--fetch-stories-max', args.fetchStoriesMax,
+      '--page', args.page
     ].concat(constArgs),
     undefined, undefined, false
   )
