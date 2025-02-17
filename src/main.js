@@ -696,12 +696,7 @@ export async function main(argSrc, pagePrev = -1, storyPrev, cycle=true) {
         if (args.autopilot) {
           // start fetching from selected story with autopilot
           console.log('launch autopilot')
-          await autopilot(
-            args.index, pageNumber, storyArrayIndex, 
-            args.fetchStoriesMax, 
-            args.storiesDir, 
-            args.forceProfile
-          )
+          await autopilot(args, storyArrayIndex)
         }
         else {
           // fetch selected story

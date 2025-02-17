@@ -198,11 +198,7 @@ export const argParser = (
 argParser.wrap(argParser.terminalWidth())
 
 /**
- * Load runtime arguments.
- * 
- * @param {string|string[]} argSrc Source of runtime arguments. Default is `process.argv`.
- * 
- * @returns {Promise<{
+ * @typedef {{
  *  logLevel: string,
  *  fetchStoriesIndex: string | undefined,
  *  fetchStoriesMax: number,
@@ -223,7 +219,15 @@ argParser.wrap(argParser.terminalWidth())
  *  query: string | RegExp | undefined,
  *  sort: string,
  *  help: boolean
- * }>}
+ * }} Args
+ */
+
+/**
+ * Load runtime arguments.
+ * 
+ * @param {string|string[]} argSrc Source of runtime arguments. Default is `process.argv`.
+ * 
+ * @returns {Promise<Args>}
  */
 export function loadArgs(argSrc=hideBin(process.argv)) {
   return new Promise(function(res) {

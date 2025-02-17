@@ -3,9 +3,9 @@ import { getStoriesIndex } from './storiesIndex.js'
 import { IndexPage } from './indexPage.js'
 import { main } from './main.js'
 import { listStoryIndexPages, loadStories } from './reader.js'
-import { OPT_VAR_PREFIX } from './config.js'
 /**
  * @typedef {import('pino').Logger} Logger
+ * @typedef {import('./config.js').Args} Args
  */
 
 /**
@@ -32,35 +32,52 @@ export function init(parentLogger) {
 }
 
 /**
+ * 
+ * @param {Args} args 
+ * @returns {string[]}
+ */
+function getConstantArgs(args) {
+  return [
+    // filesystem locations
+    '--stories-dir', args.storiesDir,
+    '--profiles-dir', args.profilesDir,
+    '--renders-dir', args.rendersDir,
+
+    // profile config
+    '--story-length-max', args.storyLengthMax
+  ]
+  .concat(args.skipProfile ? ['--skip-profile'] : [])
+  .concat(args.forceProfile ? ['--force-profile'] : [])
+}
+
+/**
  * Implementation of `--autopilot` option to call `main` multiple times for processing multiple
  * stories in sequence without pausing for user input.
  * 
- * @param {string} indexName 
- * @param {number} pageNumber
- * @param {number} storyArrayIndex 
- * @param {number} fetchStoriesMax 
- * @param {string} storiesDir
- * @param {boolean} forceProfile 
+ * @param {Args} args
+ * @param {number} storyArrayIndex
  */
-export async function autopilot(
-  indexName, pageNumber, storyArrayIndex, fetchStoriesMax, storiesDir, forceProfile
-) {
-  logger.info('begin autopilot at index=%s page=s story=@%s', indexName, pageNumber, storyArrayIndex)
+export async function autopilot(args, storyArrayIndex) {
+  logger.info('begin autopilot at index=%s page=s story=@%s', args.index, args.page, storyArrayIndex)
+
+  const constArgs = getConstantArgs(args)
 
   // fetch pages of story summaries
   await main(
     [
-      '--fetch-stories-index', indexName,
-      '--fetch-stories-max', fetchStoriesMax
-    ],
+      '--fetch-stories-index', args.index,
+      '--fetch-stories-max', args.fetchStoriesMax
+    ].concat(constArgs),
     undefined, undefined, false
   )
-  console.log(`fetched pages of ${fetchStoriesMax} story summaries`)
+  console.log(`fetched pages of ${args.fetchStoriesMax} story summaries`)
 
   /**
    * @type {Map<number, IndexPage>}
    */
-  const indexPages = (await listStoryIndexPages(storiesDir, indexName)).get(indexName)
+  const indexPages = (await listStoryIndexPages(args.storiesDir, args.index)).get(args.index)
+
+  // remove pages before 
 
   /**
    * List of promises to load and profile stories.
@@ -72,8 +89,8 @@ export async function autopilot(
     // determine list of stories to process for each page
     let stories = await loadStories(ip.filePath)
     // determine count of new stories
-    if (storyProcessorCount + stories.length > fetchStoriesMax) {
-      stories = stories.slice(0, fetchStoriesMax - storyProcessorCount)
+    if (storyProcessorCount + stories.length > args.fetchStoriesMax) {
+      stories = stories.slice(0, args.fetchStoriesMax - storyProcessorCount)
     }
     logger.info('process %s stories from page %o', stories.length, ip)
     storyProcessorCount += stories.length
@@ -82,18 +99,16 @@ export async function autopilot(
     for (let story of stories) {
       p.push(main(
         [
-          '--index', indexName, 
+          '--index', args.index, 
           '--page', pn, 
           '--story', story.id
-        ].concat(
-          forceProfile ? ['--force-profile'] : []
-        ),
+        ].concat(constArgs),
         undefined, undefined, false
       ))
     }
     pageProcessors.push(Promise.all(p))
 
-    if (storyProcessorCount >= fetchStoriesMax) {
+    if (storyProcessorCount >= args.fetchStoriesMax) {
       break
     }
   }
