@@ -1177,6 +1177,46 @@ Open this profile in an editor.
 }
 ```
 
+## Autopilot
+
+Once you're comfortable with results from profiling stories one at a time, you can use `--autopilot` to queue a list of stories to be profiled without user intervention.
+
+```shell
+# in internet, starting from first story on page 2, fetch and profile 20 stories using autopilot
+[opts]: -i internet -p 2 -s @first -m 20 -a
+```
+
+```txt
+launch autopilot
+...
+fetched pages of 20 story summaries
+queued 20 story processors across 2 page processors
+select index=internet page=2 story=1629
+select index=internet page=2 story=1630
+select index=internet page=2 story=1631
+select index=internet page=2 story=1632
+select index=internet page=2 story=1633
+select index=internet page=2 story=1634
+select index=internet page=2 story=1635
+select index=internet page=2 story=1636
+select index=internet page=2 story=1637
+select index=internet page=2 story=1638
+select index=internet page=2 story=1639
+select index=internet page=2 story=1640
+select index=internet page=3 story=1641
+select index=internet page=3 story=1642
+select index=internet page=3 story=1643
+select index=internet page=3 story=1644
+select index=internet page=3 story=1645
+select index=internet page=3 story=1646
+select index=internet page=3 story=1647
+select index=internet page=3 story=1648
+story-1629 profile at data/profiles/internet/story-1629/권여선_문상_excerpt.txt.profile.json
+...
+story-1643 profile at data/profiles/internet/story-1643/이재웅_고모의-사진_excerpt.txt.profile.json
+end autopilot
+```
+
 ## Browse library
 
 Once we've generated several story profiles, we want to quickly navigate them. Let's check available tags by which we can search.
@@ -1273,6 +1313,7 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 | `-n, --story-length-max` | Max character length of story text to include when generating its profile. | `-s` |
 | `-P, --force-profile` | Even if a profile for the selected story exists, generate a new one to replace it. | `-s` |
 | `-0, --skip-profile` | Even if a story is selected, do not generate a profile for it. | `-s` |
+| `-a, --autopilot` | Continue to cycle through stories and pages without pausing for input until `-m` is reached. Combine with `-i`, `-p`, `-s` opts to specify from which story to begin. | `-s` |
 | `-L, --show-library` | Show library (fetched stories, profiles, indexes, etc). Combine with other opts to only show a subset of items.<ul><li>`tag` = Print flat list of all available tags for searching. This is a good way to get an idea of how the stories are organized. Filters like `-t` and `-q` are not applicable here.</li><li>`txt` = Print flat list of books to a plain text file. </li><li>`md` = Render as a markdown file.</li><li>`html` [pending] = Render as a local webpage.</li></ul> | |
 | `-t, --tag` | Tag name for limiting library items. If combined with `-q`, functions like a | `-L` |
 | `-q, --query` | Query string for limiting library items by tag pattern. Surround with slashes like `/\w+e/` to search using a regular expression. Note that currently the regexp must match the whole tag name, not a substring. | `-L` |
