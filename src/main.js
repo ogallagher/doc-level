@@ -619,14 +619,19 @@ export async function main(argSrc, pagePrev = -1, storyPrev, cycle=true) {
     const renderPath = path.join(args.rendersDir, renderFilename)
     const renderFile = await writer.openFile(renderPath)
 
+    /**
+     * Chain of promises to write to the render file.
+     */
+    let p = Promise.resolve()
     try {
       for (let chunk of lib.exportLibrary(library, args.showLibrary, args.tag, args.query, args.sort)) {
-        writer.writeText(chunk, renderFile)
+        p = p.then(writer.writeText(chunk, renderFile))
       }
     }
     catch (err) {
       logger.error('library export failed. %s %o', err, err)
     }
+    await p
 
     renderFile.close()
     console.log('view library at %s', renderPath)
