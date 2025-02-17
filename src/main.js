@@ -10,6 +10,7 @@ import { StorySummary } from './storySummary.js'
 import { fileString } from './stringUtil.js'
 import { IndexPage } from './indexPage.js'
 import { flushCliLogStream } from './pinoCliLogTransport.js'
+import { autopilot } from './autopilot.js'
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -123,7 +124,7 @@ export async function resolvePageVar(pageOpt, pagePrev, indexName) {
  * current page.
  * @param {string} pagePath
  * 
- * @returns {Promise<StorySummary|number>} The story if within the bounds of the page, or `+/-infinity` if
+ * @returns {Promise<{story: StorySummary|number, storyArrayIndex: number}>} The story if within the bounds of the page, or `+/-infinity` if
  * story array index is beyond the bounds of the current page.
  */
 export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
@@ -133,7 +134,7 @@ export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
     let storyArrayIndex
 
     if (storyVar === config.OPT_VAR_FIRST) {
-      return stories[0]
+      storyArrayIndex = 0
     }
     else if (storyVar === config.OPT_VAR_NEXT) {
       if (storyPrev === undefined) {
@@ -154,15 +155,15 @@ export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
       logger.info(
         'story array index %s is beyond length=%s of page %s', storyArrayIndex, stories.length, pagePath
       )
-      return Number.POSITIVE_INFINITY
+      return {story: Number.POSITIVE_INFINITY, storyArrayIndex}
     }
     else if (storyArrayIndex < 0) {
-      return Number.NEGATIVE_INFINITY
+      return {story: Number.NEGATIVE_INFINITY, storyArrayIndex}
     }
     else {
       const story = stories[storyArrayIndex]
       logger.debug('story id var=%s resolved to %s', storyOpt, story.id)
-      return story
+      return {story, storyArrayIndex}
     }
   }
   else {
@@ -177,56 +178,6 @@ function fetchStorySummaries(storiesIndex, storiesMax, storiesDir) {
     .then((pagedStories) => {
       logger.info('fetched %s pages of stories from %s', pagedStories.size, storiesIndex)
     })
-}
-
-/**
- * @param {string} storiesDir
- * @returns {Promise<Map<string, Map<number, IndexPage>>>}
- */
-async function fetchStoryIndexPages(storiesDir) {
-  /**
-   * @type {Map<string, Map<number,IndexPage>>}
-   */
-  const indexPages = new Map()
-
-  await (
-    reader.listFiles(storiesDir, /index.json$/)
-      .then((indexPaths) => {
-        logger.debug('parsing %s story index page paths', indexPages.size)
-        const pagePathRegExp = /\/([^\/]+)\/page-(\d+)/
-
-        indexPaths.forEach(
-          /**
-           * @param {string} indexPagePath 
-           * @returns {IndexPage}
-           */
-          (indexPagePath) => {
-            const pagePathParse = indexPagePath.match(pagePathRegExp)
-            if (pagePathParse === null) {
-              logger.error('unable to parse stories index page path %s', indexPagePath)
-            }
-            else {
-              const indexPage = new IndexPage(
-                pagePathParse[1],
-                parseInt(pagePathParse[2]),
-                indexPagePath
-              )
-
-              if (indexPages.has(indexPage.indexName)) {
-                indexPages.get(indexPage.indexName).set(indexPage.pageNumber, indexPage)
-              }
-              else {
-                indexPages.set(indexPage.indexName, new Map([
-                  [indexPage.pageNumber, indexPage]
-                ]))
-              }
-            }
-          }
-        )
-      })
-  )
-
-  return indexPages
 }
 
 /**
@@ -574,14 +525,15 @@ async function createProfile(storyText, textPath, replaceIfExists) {
  * Looping program execution. End of each lap pauses for next set of arguments before
  * passing as input to the next.
  * 
- * @param {string|undefined} argSrc Source of user input arguments. Taken from `process.argv` if not 
+ * @param {string|string[]|undefined} argSrc Source of user input arguments. Taken from `process.argv` if not 
  * defined.
  * @param {number} pagePrev Previous stories index page number.
  * @param {string|undefined} storyPrev Previous story id.
+ * @param {boolean} cycle Whether loop execution, prompting for user input.
  * 
  * @returns {Promise<undefined>}
  */
-export async function main(argSrc, pagePrev = -1, storyPrev) {
+export async function main(argSrc, pagePrev = -1, storyPrev, cycle=true) {
   // runtime args
   const args = await config.loadArgs(argSrc)
 
@@ -627,7 +579,7 @@ export async function main(argSrc, pagePrev = -1, storyPrev) {
     && args.showLibrary === undefined
     && !args.help
   ) {
-    indexPages = await fetchStoryIndexPages(args.storiesDir)
+    indexPages = await reader.listStoryIndexPages(args.storiesDir)
     await showAvailableStories(indexPages)
   }
 
@@ -723,36 +675,41 @@ export async function main(argSrc, pagePrev = -1, storyPrev) {
         args.page = Number(indexPage.pageNumber).toString()
 
         // resolve story variable
-        let _storySummary = await resolveStoryVar(args.story, storyPrev, indexPage.filePath)
-        if (_storySummary === Number.NEGATIVE_INFINITY) {
-          throw new Error(`story array index ${args.story} is less than 0`)
+        let { story, storyArrayIndex } = await resolveStoryVar(args.story, storyPrev, indexPage.filePath)
+        if (story === Number.NEGATIVE_INFINITY) {
+          throw new Error(`story array index ${args.story}=${storyArrayIndex} is less than 0`)
         }
-        else if (_storySummary === Number.POSITIVE_INFINITY) {
+        else if (story === Number.POSITIVE_INFINITY) {
           throw new Error(
-            `story array index ${args.story} is beyond the last story in page ${indexPage}; `
+            `story array index ${args.story}=${storyArrayIndex} is beyond the last story in page ${indexPage}; `
             + `try next page ${pageNumber + 1}`
           )
         }
-        storySummary = _storySummary
-        args.story = _storySummary.id
+        storySummary = story
+        args.story = story.id
 
         if (args.autopilot) {
           // start fetching from selected story with autopilot
           console.log('launch autopilot')
-          await autopilot(args.index, pageNumber, storySummary, args.fetchStoriesMax)
+          await autopilot(
+            args.index, pageNumber, storyArrayIndex, 
+            args.fetchStoriesMax, 
+            args.storiesDir, 
+            args.forceProfile
+          )
         }
         else {
           // fetch selected story
           console.log(`select index=${args.index} page=${args.page} story=${args.story}`)
           logger.info('fetch index=%s page-%s=[%s] story=%s', args.index, args.page, indexPage.filePath, args.story)
 
-          const _excerptPath = getExcerptPath(args.profilesDir, args.index, args.story, _storySummary.authorName, _storySummary.title)
+          const _excerptPath = getExcerptPath(args.profilesDir, args.index, args.story, story.authorName, story.title)
           if (await writer.fileExists(_excerptPath)) {
             logger.info('excerpt file already exists; skip full text')
             excerptPath = _excerptPath
           }
           else {
-            storyText = await fetchStory(args.storiesDir, _storySummary, args.index, args.page)
+            storyText = await fetchStory(args.storiesDir, story, args.index, args.page)
           }
         }
       }
@@ -813,7 +770,13 @@ export async function main(argSrc, pagePrev = -1, storyPrev) {
   }
 
   // loop main
-  await getArgSrc().then((argSrc) => {
-    return main(argSrc, (isNaN(args.page) ? undefined : parseInt(args.page)), args.story)
-  })
+  if (cycle) {
+    logger.info('cycle main')
+    await getArgSrc().then((argSrc) => {
+      return main(argSrc, (isNaN(args.page) ? undefined : parseInt(args.page)), args.story)
+    })
+  }
+  else {
+    logger.info('end main without cycle')
+  }
 }

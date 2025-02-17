@@ -112,7 +112,7 @@ export const argParser = (
     default: false,
     description: (
       'Continue to cycle through stories and pages without pausing for input until '
-      + '--fetch-stories-max/-m is reached. Combine with --index -page -story opts to specify from which story '
+      + '--fetch-stories-max/-m is reached. Combine with --index --page --story opts to specify from which story '
       + 'to begin. If provided, --fetch-stories-index is not used in favor of --index.'
     )
   })
@@ -121,11 +121,11 @@ export const argParser = (
     type: 'string',
     description: (
       'Show library (fetched stories, profiles, indexes, etc). Combine with other opts to only '
-      + 'show a subset of items.\n'
-      + '- tag = Print flat list of all available tags for searching. Filters are not applied.\n'
-      + '- txt = Print flat list of books to a plain text file.\n'
-      + '- md = [pending] Render as a markdown file.\n'
-      + '- html = [pending] Render as a local webpage.'
+      + 'show a subset of items. '
+      + '[tag = Print flat list of all available tags for searching. Filters are not applied.] '
+      + '[txt = Print flat list of books to a plain text file.] '
+      + '[md = [pending] Render as a markdown file.] '
+      + '[html = [pending] Render as a local webpage.]'
     ),
     choices: ['tag', 'txt', 'md', 'html']
   })
@@ -148,11 +148,9 @@ export const argParser = (
     type: 'string',
     choices: ['asc', 'desc'],
     default: 'asc',
-    description: (
-      'Sort direction of search results. \n'
-      + 'Ex. "-t years-of-education -> asc" will sort easiest texts first.'
-    )
+    description: 'Sort direction of search results.'
   })
+  .example('-L txt -t years-of-education -> asc', 'Show profiled library texts with easiest first.')
   .option('stories-dir', {
     alias: 'd',
     type: 'string',

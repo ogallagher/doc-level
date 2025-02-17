@@ -711,14 +711,26 @@ export function loadStories(pagePath) {
 /**
  * Load a story from a local index page.
  * 
- * @returns {Promise<StorySummary>}
+ * @returns {Promise<{story: StorySummary, storyArrayIndex: number}>}
  */
 export async function loadStory(pagePath, storyId) {
   // load story summary from index page
-  const stories = (await loadStories(pagePath)).filter((story) => story.id === storyId)
+  let storyArrayIndex = -1
+  const stories = (await loadStories(pagePath)).filter((story, arrIdx) => {
+    if (story.id === storyId) {
+      storyArrayIndex = arrIdx
+      return true
+    }
+    else {
+      return false
+    }
+  })
 
   if (stories.length === 1) {
-    return stories[0]
+    return {
+      story: stories[0],
+      storyArrayIndex
+    }
   }
   else {
     throw new Error(`unable to load story id=${storyId} from ${pagePath}`)
@@ -766,6 +778,65 @@ export function loadProfile(profilePath) {
 
     return profile
   })
+}
+
+/**
+ * @param {string} storiesDir
+ * @param {string|undefined} indexName
+ * 
+ * @returns {Promise<Map<string, Map<number, IndexPage>>>}
+ */
+export async function listStoryIndexPages(storiesDir, indexName) {
+  /**
+   * @type {Map<string, Map<number,IndexPage>>}
+   */
+  const indexPages = new Map()
+
+  await (
+    listFiles(
+      indexName === undefined 
+      // list all index pages
+      ? storiesDir 
+      // list pages under single index
+      : path.join(storiesDir, indexName), 
+      /index.json$/
+    )
+    .then((indexPaths) => {
+      logger.debug('parsing %s story index page paths', indexPages.size)
+      const pagePathRegExp = new RegExp(`${indexName === undefined ? '([^\/]+)/' : ''}page-(\\d+)`)
+
+      indexPaths.forEach(
+        /**
+         * @param {string} indexPagePath 
+         * @returns {IndexPage}
+         */
+        (indexPagePath) => {
+          const pagePathParse = indexPagePath.match(pagePathRegExp)
+          if (pagePathParse === null) {
+            logger.error('unable to parse stories index page path="%s"', indexPagePath)
+          }
+          else {
+            const indexPage = new IndexPage(
+              indexName || pagePathParse[1],
+              parseInt(pagePathParse[indexName === undefined ? 2 : 1]),
+              indexPagePath
+            )
+
+            if (indexPages.has(indexPage.indexName)) {
+              indexPages.get(indexPage.indexName).set(indexPage.pageNumber, indexPage)
+            }
+            else {
+              indexPages.set(indexPage.indexName, new Map([
+                [indexPage.pageNumber, indexPage]
+              ]))
+            }
+          }
+        }
+      )
+    })
+  )
+
+  return indexPages
 }
 
 /**
