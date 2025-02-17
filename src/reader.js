@@ -780,7 +780,8 @@ export async function getIndexPage(indexName, pageNumber, storiesDir) {
   const page = new IndexPage(
     indexName, 
     pageNumber, 
-    path.join(storiesDir, indexName, `page-${pageNumber}`, 'index.json')
+    undefined,
+    storiesDir
   )
   /**
    * @type {StorySummary[]}

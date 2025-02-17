@@ -12,14 +12,27 @@ export class IndexPage extends LibraryDescriptor {
   /**
    * @param {string} indexName
    * @param {string|number} pageNumber
-   * @param {string} filePath
+   * @param {string|undefined} filePath
+   * @param {string|undefined} storiesDir Used to derive file path if `filePath` is not provided.
    */
-  constructor(indexName, pageNumber, filePath) {
+  constructor(indexName, pageNumber, filePath, storiesDir) {
     super()
 
+    /**
+     * @type {string}
+     */
     this.indexName = indexName
-    this.pageNumber = (typeof pageNumber === 'number' ? pageNumber : Number(pageNumber).toString())
+    /**
+     * @type {number}
+     */
+    this.pageNumber = (typeof pageNumber === 'number' ? pageNumber : parseInt(pageNumber))
+    /**
+     * @type {string}
+     */
     this.filePath = filePath
+    if (filePath === undefined) {
+      this.filePath = IndexPage.getPath(this.indexName, this.pageNumber, storiesDir)
+    }
   }
 
   static fromData({indexName, pageNumber, filePath}) {
@@ -31,6 +44,10 @@ export class IndexPage extends LibraryDescriptor {
     this.adoptTag(this.tPageNumber)
     this.adoptTag(this.tPageDir)
     this.adoptTag(this.tPageFileName)
+  }
+
+  static getPath(indexName, pageNumber, storiesDir) {
+    return path.join(storiesDir, indexName, `page-${pageNumber}`, 'index.json')
   }
 
   setTags() {

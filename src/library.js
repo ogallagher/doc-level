@@ -179,7 +179,7 @@ export function getTextTag(text) {
     // split on illegible chars
     .split(/[^a-z0-9가-힣áéíóúäëïöüÿç]+/)
     // drop small words
-    .filter((w) => w.length > TAG_TEXT_WORD_LEN_MIN)
+    .filter((w) => w.length >= TAG_TEXT_WORD_LEN_MIN)
     // space delimited
     .join(' ')
 

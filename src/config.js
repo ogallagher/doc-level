@@ -106,6 +106,16 @@ export const argParser = (
     type: 'boolean',
     description: 'Even if a story is selected, do not generate a profile for it.'
   })
+  .option('autopilot', {
+    alias: 'a',
+    type: 'boolean',
+    default: false,
+    description: (
+      'Continue to cycle through stories and pages without pausing for input until '
+      + '--fetch-stories-max/-m is reached. Combine with --index -page -story opts to specify from which story '
+      + 'to begin. If provided, --fetch-stories-index is not used in favor of --index.'
+    )
+  })
   .option('show-library', {
     alias: 'L',
     type: 'string',
@@ -207,6 +217,7 @@ argParser.wrap(argParser.terminalWidth())
  *  storyLengthMax: number,
  *  skipProfile: boolean,
  *  forceProfile: boolean,
+ *  autopilot: boolean,
  *  showLibrary: string | undefined,
  *  rendersDir: string,
  *  reload: boolean,

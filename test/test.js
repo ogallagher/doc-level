@@ -11,7 +11,7 @@ import { getTagLineageName, Library, LibraryBook, init as libraryInit, TYPE_TO_T
 import { IndexPage } from '../src/indexPage.js'
 import { StorySummary } from '../src/storySummary.js'
 import { LibraryDescriptor } from '../src/libraryDescriptor.js'
-import { resolvePageVar, resolveStoryVar } from '../src/index.js'
+import { resolvePageVar, resolveStoryVar, init as mainInit } from '../src/main.js'
 
 const logger = pino(
   {
@@ -22,6 +22,7 @@ const logger = pino(
 
 await libraryInit(logger)
 await storiesIndex.init(logger)
+await mainInit(logger)
 
 describe('textProfile', function() {
   describe('#init', function() {
