@@ -8,6 +8,7 @@ import yargs from 'yargs'
 import path from 'path'
 import { hideBin } from 'yargs/helpers'
 import { StoriesIndex } from './storiesIndex.js'
+import { compileRegexp } from './stringUtil.js'
 /**
  * @typedef {import('pino').Logger} Logger
  */
@@ -19,6 +20,34 @@ const ENV_KEY_READING_DIFFICULTY_PHRASES_MAX = 'READING_DIFFICULTY_PHRASES_MAX'
 export const OPT_VAR_PREFIX = '@'
 export const OPT_VAR_FIRST = 'first'
 export const OPT_VAR_NEXT = 'next'
+/**
+ * Operator used for logical AND in a library search expression.
+ */
+export const SEARCH_OP_AND = '&'
+/**
+ * Operator used for logical OR in a library search expression.
+ */
+export const SEARCH_OP_OR = '|'
+/**
+ * Operator used for combining/delimiting t and q terms in a library search expression.
+ */
+export const SEARCH_OP_COMPOSE = '^'
+/**
+ * Operator used for pairing t,q variables with values in a library search expression.
+ */
+export const SEARCH_OP_EQ = '=='
+/**
+ * Operator used to group terms and control order of operations in a library search expression.
+ */
+export const SEARCH_OP_GROUP = '()'
+/**
+ * Variable representing a tag name in a library search expression.
+ */
+export const SEARCH_T = 't'
+/**
+ * Variable representing a tag pattern in a library search expression.
+ */
+export const SEARCH_Q = 'q'
 
 const OpenAIChatModel = {
   GPT_4: 'gpt-4o',
@@ -121,10 +150,10 @@ export const argParser = (
     type: 'string',
     description: (
       'Show library (fetched stories, profiles, indexes, etc). Combine with other opts to only '
-      + 'show a subset of items. '
+      + 'show a subset of/search items. '
       + '[tag = Print flat list of all available tags for searching. Filters are not applied.] '
       + '[txt = Print flat list of books to a plain text file.] '
-      + '[md = [pending] Render as a markdown file.] '
+      + '[md = Render as a markdown file.] '
       + '[html = [pending] Render as a local webpage.]'
     ),
     choices: ['tag', 'txt', 'md', 'html']
@@ -132,17 +161,33 @@ export const argParser = (
   .option('tag', {
     alias: 't',
     type: 'string',
-    description: 'Tag name for limiting library items.'
+    description: 'Exact tag name for searching library items.'
   })
   .option('query', {
     alias: 'q',
     type: 'string',
     description: (
-      'Query string for limiting library items by tag pattern. '
-      + 'Surround with slashes like /\\w+e/ to search using a regular expression. Note that currently '
-      + 'the regexp must match the whole tag name, not a substring.'
+      'Tag name pattern as a query string for searching library items. '
+      + 'Surround the value with slashes like /\\w+e/ to search using a regular expression. Note that currently '
+      + 'the regexp must match the whole tag name, not a substring. '
+      + 'If combined with -t, -t is applied first, then -q is applied to child tags of -t.'
     )
   })
+  .option('search-expr', {
+    alias: '?',
+    type: 'string',
+    description: (
+      'Library search expression with support for logical operators. '
+      + 'See examples for how to use instead of single-term opts -t and -q.'
+    )
+  })
+  .example(
+    `-L txt -? "(t == 'tag1' ${SEARCH_OP_COMPOSE} q == '/.*query\d.+/') ${SEARCH_OP_AND} (t == 'tag2') ${SEARCH_OP_OR} t == 'tag3'"`,
+    (
+      'Search library for items with tags under tag1 that match regexp /.*query\d+/, and also have tag2, '
+      + `or have tag3. Note "t == 'val' ${SEARCH_OP_COMPOSE} q == 'val'" corresponds to single-term opts "-t val -q val".`
+    )
+  )
   .option('sort', {
     alias: '>',
     type: 'string',
@@ -217,6 +262,7 @@ argParser.wrap(argParser.terminalWidth())
  *  reload: boolean,
  *  tag: string | undefined,
  *  query: string | RegExp | undefined,
+ *  searchExpr: string | undefined,
  *  sort: string,
  *  help: boolean
  * }} Args
@@ -236,10 +282,13 @@ export function loadArgs(argSrc=hideBin(process.argv)) {
     const argv = argParser.parse(argSrc)
 
     // query
-    if (argv.query !== undefined && argv.query.startsWith('/') && argv.query.endsWith('/')) {
-      const query_regexp = new RegExp(argv.query.substring(1, argv.query.length-1))
-      logger.debug('converted raw query %s to regexp %s', argv.query, query_regexp)
-      argv.query = query_regexp
+    if (argv.query !== undefined) {
+      const query_regexp = compileRegexp(argv.query)
+      if (query_regexp !== undefined) {
+        logger.debug('converted raw query %s to regexp %s', argv.query, query_regexp)
+        argv.query = query_regexp
+      }
+      // else, leave as string
     }
   
     logger.info('loaded runtime args')

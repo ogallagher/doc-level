@@ -260,6 +260,18 @@ describe('library', () => {
    * @type {LibraryBook}
    */
   let book2
+  /**
+   * @type {LibraryBook}
+   */
+  let bookA
+  /**
+   * @type {LibraryBook}
+   */
+  let bookB
+  /**
+   * @type {LibraryBook}
+   */
+  let bookC
 
   before(async () => {
     library = new Library()
@@ -271,6 +283,9 @@ describe('library', () => {
       1, 
       path.join(import.meta.dirname, 'resource/stories/index1/page-1/index.json')
     )
+    /**
+     * @type {StorySummary[]}
+     */
     let page1Stories = await loadText(page1.filePath).then(JSON.parse)
 
     let story1 = StorySummary.fromData(page1Stories[0])
@@ -285,6 +300,28 @@ describe('library', () => {
 
     book1 = new LibraryBook(library, story1, page1, profile1)
     book2 = new LibraryBook(library, story2, page1, undefined)
+    bookA = new LibraryBook(
+      library, 
+      StorySummary.fromData(page1Stories.filter((s) => s.id === 'aa')[0]),
+      page1,
+      undefined
+    )
+    logger.debug('bookA=%s', bookA)
+    library.addBook(bookA)
+    bookB = new LibraryBook(
+      library, 
+      StorySummary.fromData(page1Stories.filter((s) => s.id === 'bb')[0]),
+      page1,
+      undefined
+    )
+    library.addBook(bookB)
+    bookC = new LibraryBook(
+      library, 
+      StorySummary.fromData(page1Stories.filter((s) => s.id === 'cc')[0]),
+      page1,
+      undefined
+    )
+    library.addBook(bookC)
   })
 
   describe('#getTagLineageName', () => {
@@ -408,6 +445,54 @@ describe('library', () => {
         assert.notStrictEqual(booksAfter[0], book1)
       })
     })
+
+    describe('#execSearchExpression', () => {
+      it('handles single conditions', () => {
+        // publish-date.2000-01-01
+        let searchExpr = `t == '2000-01-01'`
+        let res = [...library.execSearchExpression(searchExpr, 'asc')]
+        assert.strictEqual(res.length, 1)
+        assert.strictEqual(res[0][0].story.id, 'aa')
+      })
+
+      it('handles composite conditions', () => {
+        // publish-date in year 2000
+        let searchExpr = `t == 'publish-date' ^ q == '/2000-.+/'`
+        let res = [...library.execSearchExpression(searchExpr, 'asc')]
+        assert.strictEqual(res.length, 3)
+        res.forEach(([book, _bookPath]) => {
+          assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
+        })
+
+        // handle redundant nested groups
+        searchExpr = `((((t == 'publish-date'))) ^ ((q) == ('/2000-.+/')))`
+        res = [...library.execSearchExpression(searchExpr, 'asc')]
+        assert.strictEqual(res.length, 3)
+        res.forEach(([book, _bookPath]) => {
+          assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
+        })
+      })
+
+      it('handles AND/intersection set operation', () => {
+        let searchExpr = `(t == 'publish-date' ^ q == '/2000-.+/') & (t == 'title' ^ q == '/.+a-or-b/')`
+        let res = [...library.execSearchExpression(searchExpr, 'asc')]
+        assert.strictEqual(res.length, 2)
+        res.forEach(([book, _bookPath]) => {
+          assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
+          assert.ok(book.story.title.endsWith('a-or-b'))
+        })
+      })
+
+      it('handles OR/union set operation', () => {
+        let searchExpr = `(t == 'publish-date' ^ q == '/2000-01.+/') | (t == 'publish-date' ^ q == '/2000-02.+/')`
+        let res = [...library.execSearchExpression(searchExpr, 'asc')]
+        assert.strictEqual(res.length, 2)
+        res.forEach(([book, _bookPath]) => {
+          assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
+          assert.notStrictEqual(book.story.publishDate.getUTCMonth(), 3)
+        })
+      })
+    })
   })
 
   describe('LibraryBook', () => {
@@ -529,11 +614,12 @@ describe ('entrypoint cli opts', () => {
 
     describe('#resolveStoryVar', () => {
       it('handles both contained and spilled story array indexes', async () => {
-        const pageLength = 2
+        const pageLength = 5
         const pagePath = 'test/resource/stories/index1/page-1/index.json'
         const storyIds = [
           '142',
-          'restore2004_223748051577'
+          'restore2004_223748051577',
+          'aa', 'bb', 'cc'
         ]
 
         // first ignores previous
@@ -557,7 +643,7 @@ describe ('entrypoint cli opts', () => {
         assert.strictEqual(story.id, storyIds[1])
 
         // next is above max
-        story = (await resolveStoryVar('@next', storyIds[1], pagePath)).story
+        story = (await resolveStoryVar('@next', storyIds[pageLength-1], pagePath)).story
         assert.strictEqual(story, Number.POSITIVE_INFINITY)
       })
     })

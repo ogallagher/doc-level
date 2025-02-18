@@ -21,6 +21,19 @@ export function regexpEscape(str) {
   return str.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
+/**
+ * Convert regexp string literal to RegExp instance.
+ * 
+ * @param {string} str 
+ * 
+ * @returns {RegExp|undefined}
+ */
+export function compileRegexp(str) {
+  if (str.startsWith('/') && str.endsWith('/')) {
+    return new RegExp(str.substring(1, str.length-1))
+  }
+}
+
 export function fileString(str) {
   return sanitizeFilename(str)
   .replace(/\s+/g, '-')

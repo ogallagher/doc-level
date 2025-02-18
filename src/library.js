@@ -1,13 +1,16 @@
 import { RelationalTag, RelationalTagConnection } from 'relational_tags'
+import { parse as parseExpr } from 'subscript'
 import { LibraryDescriptor } from './libraryDescriptor.js'
 import { Difficulty, Ideology, Maturity, TextProfile, Topic } from './textProfile.js'
 import { StoriesIndex, getStoriesIndex } from './storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
 import { loadText, loadProfile, getProfilePath } from './reader.js'
-import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX } from './config.js'
+import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q } from './config.js'
+import { compileRegexp } from './stringUtil.js'
 /**
  * @typedef {import('pino').Logger} Logger
+ * @typedef {Array<string|SearchExpression>} SearchExpression Multi term expression.
  */
 
 /**
@@ -176,8 +179,8 @@ export function getTextTag(text) {
     let tagText = text
     // lowercase
     .toLowerCase()
-    // split on illegible chars
-    .split(/[^a-z0-9가-힣áéíóúäëïöüÿç]+/)
+    // split on illegible chars, allowing underscores and hyphens within words
+    .split(/[^a-z0-9가-힣áéíóúäëïöüÿç\-_]+/)
     // drop small words
     .filter((w) => w.length >= TAG_TEXT_WORD_LEN_MIN)
     // space delimited
@@ -580,13 +583,170 @@ export class Library extends LibraryDescriptor {
   }
 
   /**
+   * @param {[string, string|[undefined,string], string|[undefined,string]]} terms Terms of the condition.
+   * Literals are represented as a 2-element array where arr[0] is an undefined operator.
+   * They are not noted in param type hint, but `a` and `b` can also be nested group expressions,
+   * each with a single term.
+   * 
+   * @returns `[startTag, query]`
+   */
+  static getSearchCondition([eq, a, b]) {
+    // resolve extra nested groups
+    while (eq === SEARCH_OP_GROUP) {
+      [eq, a, b] = a
+    }
+    while (Array.isArray(a) && a[0] === SEARCH_OP_GROUP) {
+      a = a[1]
+    }
+    while (Array.isArray(b) && b[0] === SEARCH_OP_GROUP) {
+      b = b[1]
+    }
+
+    // flip backward condition
+    if (b === SEARCH_T || b === SEARCH_Q) {
+      let temp = a
+      a = b
+      b = temp
+    }
+
+    if (b.length !== 2) {
+      throw new Error(
+        `expected ${b} to be a literal term represented by length-2 array`, {
+          cause: [eq, a, b]
+        }
+      )
+    }
+
+    if (a === SEARCH_T) {
+      return [RelationalTag.get(b[1]), undefined]
+    }
+    else if (a === SEARCH_Q) {
+      return [undefined, compileRegexp(b[1])]
+    }
+    else {
+      throw new Error(
+        `in search condition ${eq} ${a} ${b} one of terms must be ${SEARCH_T} or ${SEARCH_Q}`
+      )
+    }
+  }
+  
+  /**
+   * @param {SearchExpression} expr 
+   * @param {string} sort
+   * 
+   * @returns {Generator<[LibraryBook, RelationalTagConnection[]]}
+   */
+  *execSearchExpression(expr, sort) {
+    if (!Array.isArray(expr)) {
+      logger.debug('raw search expr="%s"', expr)
+      /**
+       * @type {SearchExpression}
+       */
+      expr = parseExpr(expr)
+      logger.debug('parsed search expr as %o', expr)
+    }
+    // else, expression is already parsed and ready for execution
+
+    if (!Array.isArray(expr)) {
+      throw new Error(`failed to parse search expression ${expr}`, {
+        cause: expr
+      })
+    }
+
+    const op = expr[0]
+    const a = expr[1]
+    const b = expr[2]
+
+    if (op === SEARCH_OP_GROUP) {
+      for (let res of this.execSearchExpression(a)) {
+        yield res
+      }
+    }
+    else if (op === SEARCH_OP_AND || op === SEARCH_OP_OR) {
+      // set operations
+      let resA = this.execSearchExpression(a)
+      let resB = this.execSearchExpression(b)
+
+      if (op === SEARCH_OP_AND) {
+        // AND = set intersection
+        let booksA = new Map([...resA])
+        let booksB = new Map([...resB])
+
+        for (let book of booksA.keys()) {
+          if (booksB.has(book)) {
+            yield [book, booksA[book]]
+          }
+          // else, not within intersection
+        }
+      }
+      else {
+        // OR = set union
+        /**
+         * @type {Set<LibraryBook>}
+         */
+        let books = new Set()
+        
+        for (let [book, path] of resA) {
+          if (!books.has(book)) {
+            books.add(book)
+            yield [book, path]
+          }
+        }
+
+        for (let [book, path] of resB) {
+          if (!books.has(book)) {
+            books.add(book)
+            yield [book, path]
+          }
+        }
+      }
+    }
+    else if (op === SEARCH_OP_COMPOSE) {
+      // composite condition (tag + query)
+      let [t1, q1] = Library.getSearchCondition(a)
+      let [t2, q2] = Library.getSearchCondition(b)
+
+      if (t1 !== undefined && t2 !== undefined) {
+        throw new Error(
+          `1 composite condition ${expr} cannot define 2 start tags`
+        )
+      }
+      else if (q1 !== undefined && q2 !== undefined) {
+        throw new Error(
+          `1 composite condition ${expr} cannot define 2 tag patterns/queries`
+        )
+      }
+      else if (t1 !== undefined) {
+        for (let res of this.getBooks(t1, q2, sort)) {
+          yield res
+        }
+      }
+      else {
+        for (let res of this.getBooks(t2, q1, sort)) {
+          yield res
+        }
+      }
+    }
+    else if (op === SEARCH_OP_EQ) {
+      // single condition
+      let [t, q] = Library.getSearchCondition(expr)
+      for (let res of this.getBooks(t, q, sort)) {
+        yield res
+      }
+    }
+    else {
+      throw new Error(`unsupported operator ${op} in search expression ${expr}`)
+    }
+  }
+
+  /**
    * Fetch books according to a search query.
    * 
    * @param {RelationalTag} startTag Tag from which to search.
    * @param {string|RegExp|undefined} query Search query.
    * @param {string} sort Sort direction. 
    * 
-   * @return {Generator<[LibraryBook, RelationalTagConnection[]]>}
+   * @returns {Generator<[LibraryBook, RelationalTagConnection[]]>}
    */
   *getBooks(startTag, query, sort) {
     /**
