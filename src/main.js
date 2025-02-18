@@ -641,6 +641,9 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
       'library'
       + (args.tag !== undefined ? `_t=${args.tag}` : '')
       + (args.query !== undefined ? `_q=${args.query}` : '')
+      + (args.searchExpr !== undefined ? `_search-expr=${
+          args.searchExpr.replaceAll(config.SEARCH_OP_EQ, '').replaceAll("'", '')
+        }` : '')
       + (args.showLibrary === 'tag' ? `_tags.txt` : `.${args.showLibrary}`)
     )
     const renderPath = path.join(args.rendersDir, renderFilename)
@@ -651,7 +654,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
      */
     let p = Promise.resolve()
     try {
-      for (let chunk of lib.exportLibrary(library, args.showLibrary, args.tag, args.query, args.sort)) {
+      for (let chunk of lib.exportLibrary(library, args.showLibrary, args.tag, args.query, args.searchExpr, args.sort)) {
         p = p.then(writer.writeText(chunk, renderFile))
       }
     }

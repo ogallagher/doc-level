@@ -67,7 +67,7 @@ export const TOPIC_EXAMPLES_MAX = 10
 export const IDEOLOGIES_MAX = 6
 export const IDEOLOGY_EXAMPLES_MAX = 10
 export const SEARCH_TAGS_MAX = 10
-export const SEARCH_TAG_BOOKS_MAX = 50
+export const SEARCH_TAG_BOOKS_MAX = 1000
 
 /**
  * @type {Logger}

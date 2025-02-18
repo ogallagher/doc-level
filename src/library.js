@@ -241,12 +241,13 @@ export function getTagLineageName(tag, delim='.', truncPrefix='...') {
  * @param {Library} library 
  * @param {string} format
  * @param {string|undefined} startTagName Tag from which to search.
- * @param {string|RegExp|undefined} query Search query.
+ * @param {string|RegExp|undefined} query Tag search query.
+ * @param {string|undefined} searchExpr Tag search expression.
  * @param {string} sort Sort direction. 
  * 
  * @returns {Generator<string>}
  */
-export function *exportLibrary(library, format, startTagName, query, sort) {
+export function *exportLibrary(library, format, startTagName, query, searchExpr, sort) {
   /**
    * @type {RelationalTag}
    */
@@ -276,7 +277,11 @@ export function *exportLibrary(library, format, startTagName, query, sort) {
   }
   else {
     // TODO why is last pathToBook edge recursive?
-    const bookGen = library.getBooks(startTag, query, sort)
+    const bookGen = (
+      searchExpr === undefined
+      ? library.getBooks(startTag, query, sort)
+      : library.execSearchExpression(searchExpr, sort)
+    )
     /**
      * @type {LibraryBook}
      */
@@ -289,7 +294,7 @@ export function *exportLibrary(library, format, startTagName, query, sort) {
     if (format === 'txt') {
       logger.info('render library as a list books')
   
-      yield `=== books in library for start-tag=${startTagName} query=${query} sort=${sort}\n\n`
+      yield `=== books in library for start-tag=${startTagName} query=${query} search-expr="${searchExpr}" sort=${sort}\n\n`
       for (
         let next = bookGen.next(); 
         !next.done && ([book, bookSearchPath] = next.value);
@@ -300,7 +305,7 @@ export function *exportLibrary(library, format, startTagName, query, sort) {
           yield chunk
         }
   
-        yield '\n\n'
+        yield '\n'
       }
       yield `===\n`
     }
@@ -312,7 +317,7 @@ export function *exportLibrary(library, format, startTagName, query, sort) {
 
       // save input
       yield `## input\n\n`
-      yield `\`--show-library ${format} --tag ${startTagName} --query ${query} --sort ${sort}\`\n`
+      yield `\`--show-library ${format} --tag ${startTagName} --query ${query} --search-expr="${searchExpr}" --sort ${sort}\`\n`
       yield '\n'
 
       yield `## output\n\n`
@@ -621,7 +626,8 @@ export class Library extends LibraryDescriptor {
       return [RelationalTag.get(b[1]), undefined]
     }
     else if (a === SEARCH_Q) {
-      return [undefined, compileRegexp(b[1])]
+      let bRegexp = compileRegexp(b[1])
+      return [undefined, bRegexp === undefined ? b[1] : bRegexp]
     }
     else {
       throw new Error(
@@ -672,6 +678,7 @@ export class Library extends LibraryDescriptor {
         let booksA = new Map([...resA])
         let booksB = new Map([...resB])
 
+        // I think we could use Map.intersection here, but perfer to loop through manually to yield on demand
         for (let book of booksA.keys()) {
           if (booksB.has(book)) {
             yield [book, booksA[book]]
@@ -686,6 +693,7 @@ export class Library extends LibraryDescriptor {
          */
         let books = new Set()
         
+        // I think we could use Map.union here, but perfer to loop through manually to yield on demand
         for (let [book, path] of resA) {
           if (!books.has(book)) {
             books.add(book)
