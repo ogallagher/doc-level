@@ -243,7 +243,7 @@ export function getTagLineageName(tag, delim='.', truncPrefix='...') {
  * @param {string|undefined} startTagName Tag from which to search.
  * @param {string|RegExp|undefined} query Tag search query.
  * @param {string|undefined} searchExpr Tag search expression.
- * @param {string} sort Sort direction. 
+ * @param {string|undefined} sort Sort direction. 
  * 
  * @returns {Generator<string>}
  */
@@ -638,7 +638,7 @@ export class Library extends LibraryDescriptor {
   
   /**
    * @param {SearchExpression} expr 
-   * @param {string} sort
+   * @param {string|undefined} sort
    * 
    * @returns {Generator<[LibraryBook, RelationalTagConnection[]]}
    */
@@ -664,21 +664,21 @@ export class Library extends LibraryDescriptor {
     const b = expr[2]
 
     if (op === SEARCH_OP_GROUP) {
-      for (let res of this.execSearchExpression(a)) {
+      for (let res of this.execSearchExpression(a, sort)) {
         yield res
       }
     }
     else if (op === SEARCH_OP_AND || op === SEARCH_OP_OR) {
       // set operations
-      let resA = this.execSearchExpression(a)
-      let resB = this.execSearchExpression(b)
+      let resA = this.execSearchExpression(a, sort)
+      let resB = this.execSearchExpression(b, sort)
 
       if (op === SEARCH_OP_AND) {
         // AND = set intersection
         let booksA = new Map([...resA])
         let booksB = new Map([...resB])
 
-        // I think we could use Map.intersection here, but perfer to loop through manually to yield on demand
+        // I think we could use Map.intersection here, but prefer to loop through manually to yield on demand
         for (let book of booksA.keys()) {
           if (booksB.has(book)) {
             yield [book, booksA.get(book)]
@@ -693,7 +693,7 @@ export class Library extends LibraryDescriptor {
          */
         let books = new Set()
         
-        // I think we could use Map.union here, but perfer to loop through manually to yield on demand
+        // I think we could use Map.union here, but prefer to loop through manually to yield on demand
         for (let [book, path] of resA) {
           if (!books.has(book)) {
             books.add(book)
@@ -711,8 +711,8 @@ export class Library extends LibraryDescriptor {
     }
     else if (op === SEARCH_OP_COMPOSE) {
       // composite condition (tag + query)
-      let [t1, q1] = Library.getSearchCondition(a)
-      let [t2, q2] = Library.getSearchCondition(b)
+      let [t1, q1] = Library.getSearchCondition(a, sort)
+      let [t2, q2] = Library.getSearchCondition(b, sort)
 
       if (t1 !== undefined && t2 !== undefined) {
         throw new Error(
@@ -737,7 +737,10 @@ export class Library extends LibraryDescriptor {
     }
     else if (op === SEARCH_OP_EQ) {
       // single condition
-      let [t, q] = Library.getSearchCondition(expr)
+      let [t, q] = Library.getSearchCondition(expr, sort)
+      if (t === undefined) {
+        t = this
+      }
       for (let res of this.getBooks(t, q, sort)) {
         yield res
       }
@@ -752,7 +755,7 @@ export class Library extends LibraryDescriptor {
    * 
    * @param {RelationalTag} startTag Tag from which to search.
    * @param {string|RegExp|undefined} query Search query.
-   * @param {string} sort Sort direction. 
+   * @param {string|undefined} sort Sort direction. 
    * 
    * @returns {Generator<[LibraryBook, RelationalTagConnection[]]>}
    */
@@ -784,8 +787,14 @@ export class Library extends LibraryDescriptor {
     }
 
     // sort result tags
-    let sortedTags = Library.sortSearchItems(resultTags, sort)
-    logger.debug('sorted tags %s with first=%s', sort, sortedTags[0])
+    /**
+     * @type {[RelationalTag, RelationalTagConnection[]][]|undefined}
+     */
+    let sortedTags
+    if (sort !== undefined) {
+      sortedTags = Library.sortSearchItems(resultTags, sort)
+      logger.debug('sorted tags %s with first=%s', sort, )
+    }
 
     // convert tags to books
     /**
@@ -801,7 +810,7 @@ export class Library extends LibraryDescriptor {
      */
     let resultBooks = new Set()
     let t = 0
-    for (let [startTag, pathToStartTag] of sortedTags) {
+    for (let [startTag, pathToStartTag] of (sort !== undefined ? sortedTags : resultTags.entries())) {
       if (t < SEARCH_TAGS_MAX) {
         /**
          * @type {Map<LibraryDescriptor, RelationalTagConnection[]>}
@@ -818,10 +827,16 @@ export class Library extends LibraryDescriptor {
         )
 
         // sort result descriptors
-        let sortedDescriptors = Library.sortSearchItems(descriptors, sort)
+        /**
+         * @type {[LibraryDescriptor, RelationalTagConnection[]][]|undefined>}
+         */
+        let sortedDescriptors
+        if (sort !== undefined) {
+          sortedDescriptors = Library.sortSearchItems(descriptors, sort)
+        }
 
         let b = 0
-        for (let [descriptor, pathToDescriptor] of sortedDescriptors) {
+        for (let [descriptor, pathToDescriptor] of (sort !== undefined ? sortedDescriptors : descriptors.entries())) {
           if (b < SEARCH_TAG_BOOKS_MAX) {
             resultDescriptors.add(descriptor)
             const book = LibraryBook.getBook(descriptor)[0]

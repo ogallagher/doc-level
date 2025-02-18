@@ -192,8 +192,7 @@ export const argParser = (
     alias: '>',
     type: 'string',
     choices: ['asc', 'desc'],
-    default: 'asc',
-    description: 'Sort direction of search results.'
+    description: 'Sort direction of search results. Default is not sorted.'
   })
   .example('-L txt -t years-of-education -> asc', 'Show profiled library texts with easiest first.')
   .option('stories-dir', {
