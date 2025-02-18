@@ -655,7 +655,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     let p = Promise.resolve()
     try {
       for (let chunk of lib.exportLibrary(library, args.showLibrary, args.tag, args.query, args.searchExpr, args.sort)) {
-        p = p.then(writer.writeText(chunk, renderFile))
+        p = p.then(() => writer.writeText(chunk, renderFile))
       }
     }
     catch (err) {
