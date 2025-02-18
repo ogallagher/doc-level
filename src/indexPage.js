@@ -1,8 +1,8 @@
 import { RelationalTag } from 'relational_tags'
 import path from 'node:path'
+import { TYPE_TO_TAG_CHILD } from './config.js'
 import { LibraryDescriptor } from './libraryDescriptor.js'
-import { StoriesIndex } from './storiesIndex.js'
-import { TYPE_TO_TAG_CHILD } from './library.js'
+import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 
 export class IndexPage extends LibraryDescriptor {
   static get tPageNumber() { return RelationalTag.new('page-number') }

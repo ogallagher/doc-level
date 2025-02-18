@@ -7,15 +7,27 @@ import OpenAI from 'openai'
 import yargs from 'yargs'
 import path from 'path'
 import { hideBin } from 'yargs/helpers'
-import { StoriesIndex } from './storiesIndex.js'
 import { compileRegexp } from './stringUtil.js'
+import { RelationalTagConnection } from 'relational_tags'
 /**
  * @typedef {import('pino').Logger} Logger
+ * @typedef {import('./storiesIndex/storiesIndex.js').StoriesIndex} StoriesIndex
  */
 
 const ENV_KEY_OPENAI_API_KEY = 'OPENAI_API_KEY' 
 const ENV_KEY_READING_DIFFICULTY_WORDS_MAX = 'READING_DIFFICULTY_WORDS_MAX'
 const ENV_KEY_READING_DIFFICULTY_PHRASES_MAX = 'READING_DIFFICULTY_PHRASES_MAX'
+
+/**
+ * tag-tag connection type for parent to child.
+ * @type {string}
+ */
+export const TYPE_TO_TAG_CHILD = RelationalTagConnection.TYPE_TO_TAG_CHILD
+/**
+ * tag-tag connection type for child to parent.
+ * @type {string}
+ */
+export const TYPE_TO_TAG_PARENT = RelationalTagConnection.inverse_type(TYPE_TO_TAG_CHILD)
 
 export const OPT_VAR_PREFIX = '@'
 export const OPT_VAR_FIRST = 'first'

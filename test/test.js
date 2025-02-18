@@ -2,12 +2,15 @@ import assert from 'assert'
 import pino from 'pino'
 import path from 'path'
 import { RelationalTag as rt } from 'relational_tags'
+import { TYPE_TO_TAG_CHILD } from '../src/config.js'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
 import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml, reduceStory, loadProfile, getProfilePath } from '../src/reader.js'
-import * as storiesIndex from '../src/storiesIndex.js'
-import { getTagLineageName, Library, LibraryBook, init as libraryInit, TYPE_TO_TAG_CHILD } from '../src/library.js'
+import { init as siInit, getStoriesIndex } from '../src/storiesIndex/index.js'
+import { StoriesIndex } from '../src/storiesIndex/storiesIndex.js'
+import { MunjangStoriesIndex } from '../src/storiesIndex/MunjangStoriesIndex.js' 
+import { getTagLineageName, Library, LibraryBook, init as libraryInit } from '../src/library.js'
 import { IndexPage } from '../src/indexPage.js'
 import { StorySummary } from '../src/storySummary.js'
 import { LibraryDescriptor } from '../src/libraryDescriptor.js'
@@ -21,7 +24,7 @@ const logger = pino(
 )
 
 await libraryInit(logger)
-await storiesIndex.init(logger)
+await siInit(logger)
 await mainInit(logger)
 
 describe('textProfile', function() {
@@ -181,23 +184,23 @@ describe('reader', function() {
 describe('storiesIndex', function() {
   describe('#init', function() {
     it('passes with parent logger', function() {
-      return storiesIndex.init(logger)
+      return siInit(logger)
     })
   })
 
   describe('StoriesIndex', function() {
     /**
-     * @type {storiesIndex.StoriesIndex}
+     * @type {StoriesIndex}
      */
     let asi
     /**
-     * @type {storiesIndex.MunjangStoriesIndex}
+     * @type {MunjangStoriesIndex}
      */
     let mji
 
     before(async function() {
-      asi = new storiesIndex.StoriesIndex('https://host.tld', ['abstract0'])
-      mji = storiesIndex.getStoriesIndex('문장웹진')
+      asi = new StoriesIndex('https://host.tld', ['abstract0'])
+      mji = getStoriesIndex('문장웹진')
     })
 
     describe('#getPageUrl', function() {
@@ -223,7 +226,7 @@ describe('storiesIndex', function() {
 
     describe('#storiesIndexes', function() {
       it('is updated with each instance', function() {
-        assert.ok(storiesIndex.getStoriesIndex(asi.name) !== undefined)
+        assert.ok(getStoriesIndex(asi.name) !== undefined)
       })
     })
 
@@ -276,7 +279,7 @@ describe('library', () => {
   before(async () => {
     library = new Library()
 
-    let index1 = new storiesIndex.StoriesIndex('https://host.tld', ['index1', 'i1'])
+    let index1 = new StoriesIndex('https://host.tld', ['index1', 'i1'])
 
     let page1 = new IndexPage(
       index1.name, 
@@ -560,11 +563,11 @@ describe('library', () => {
         [LibraryBook.t, StorySummary.t, 1],
         [LibraryBook.t, textProfile.TextProfile.t, 1],
         // library has index
-        [storiesIndex.StoriesIndex.t, Library.t, 1],
+        [StoriesIndex.t, Library.t, 1],
         // index name belongs to page (and index)
-        [IndexPage.t, storiesIndex.StoriesIndex.tName, 1],
+        [IndexPage.t, StoriesIndex.tName, 1],
         // and page belongs to index 
-        [IndexPage.t, storiesIndex.StoriesIndex.t, 1], 
+        [IndexPage.t, StoriesIndex.t, 1], 
         // transitive property a--c = a--b + b--c
         [Library.t, textProfile.TextProfile.t, 2], // library--book--profile
         [StorySummary.tAuthorName, StorySummary.tTitle, 2], // author-name--story--title
@@ -588,7 +591,7 @@ describe('library', () => {
 
 describe ('entrypoint cli opts', () => {
   describe('variable expressions', () => {
-    const index1 = new storiesIndex.StoriesIndex(
+    const index1 = new StoriesIndex(
       'https://host.tld', ['index1', 'i1'], 1, 5
     )
 

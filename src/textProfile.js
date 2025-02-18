@@ -1,6 +1,7 @@
-import { RelationalTag } from "relational_tags"
+import { RelationalTag } from 'relational_tags'
+import { TYPE_TO_TAG_CHILD } from './config.js'
 import { LibraryDescriptor } from './libraryDescriptor.js'
-import { TYPE_TO_TAG_CHILD } from './library.js'
+
 /**
  * @typedef {import('pino').Logger} Logger
  */

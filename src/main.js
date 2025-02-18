@@ -5,7 +5,9 @@ import * as config from './config.js'
 import * as reader from './reader.js'
 import * as tp from './textProfile.js'
 import * as writer from './writer.js'
-import * as si from './storiesIndex.js'
+import { getStoriesIndex } from './storiesIndex/index.js'
+import { StoriesIndex } from './storiesIndex/storiesIndex.js'
+import { LOCAL_INDEX_NAME } from './storiesIndex/LocalStoriesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { fileString } from './stringUtil.js'
 import { IndexPage } from './indexPage.js'
@@ -79,7 +81,7 @@ function getArgSrc() {
 export async function resolvePageVar(pageOpt, pagePrev, indexName) {
   if (pageOpt.startsWith(config.OPT_VAR_PREFIX)) {
     const pageVar = pageOpt.substring(config.OPT_VAR_PREFIX.length)
-    const index = si.getStoriesIndex(indexName)
+    const index = getStoriesIndex(indexName)
 
     if (pageVar === config.OPT_VAR_FIRST) {
       return index.pageNumberMin
@@ -178,7 +180,7 @@ export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
 }
 
 /**
- * @param {si.StoriesIndex} index 
+ * @param {StoriesIndex} index 
  * @param {string} startPage
  * @param {number} storiesMax 
  * @param {string} storiesDir 
@@ -236,7 +238,7 @@ async function showAvailableStories(indexPages) {
  * @returns {Promise<IndexPage>}
  */
 async function updateLocalIndexPage(story, storiesDir) {
-  const index = si.getStoriesIndex(si.LocalStoriesIndex.indexName)
+  const index = getStoriesIndex(LOCAL_INDEX_NAME)
   const { page, stories } = await reader.getIndexPage(index.name, index.pageNumberMin, storiesDir)
 
   // delete existing story with same id
@@ -369,7 +371,7 @@ async function fetchLocalStory(localStoryPath, storiesDir) {
  * @returns {Promise<string[]>}
  */
 async function fetchStory(storiesDir, story, indexName, indexPage) {
-  const storyIndex = si.getStoriesIndex(indexName)
+  const storyIndex = getStoriesIndex(indexName)
 
   // check for existing local files to skip ahead
   const tempDir = path.join(`data/temp/${indexName}/page-${indexPage}/story-${story.id}`)
@@ -403,7 +405,7 @@ async function fetchStory(storiesDir, story, indexName, indexPage) {
 
     await writer.initDir(path.dirname(storyFullTextPath))
 
-    let textGenerator = si.getStoriesIndex(indexName).getStoryText(storyPage)
+    let textGenerator = getStoriesIndex(indexName).getStoryText(storyPage)
 
     /**
      * @type {string}
@@ -583,7 +585,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   // fetch new story summaries
   if (args.fetchStoriesIndex !== undefined && !args.autopilot) {
     await fetchStorySummaries(
-      si.getStoriesIndex(args.fetchStoriesIndex),
+      getStoriesIndex(args.fetchStoriesIndex),
       args.page,
       args.fetchStoriesMax,
       args.storiesDir
@@ -687,7 +689,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     (async () => {
       if (args.story !== undefined) {
         // resolve index alias
-        args.index = si.getStoriesIndex(args.index).name
+        args.index = getStoriesIndex(args.index).name
 
         // resolve page variable
         let pageNumber = await resolvePageVar(args.page, pagePrev, args.index)

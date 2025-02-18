@@ -1,12 +1,13 @@
-import { RelationalTag, RelationalTagConnection } from 'relational_tags'
+import { RelationalTag } from 'relational_tags'
 import { parse as parseExpr } from 'subscript'
 import { LibraryDescriptor } from './libraryDescriptor.js'
 import { Difficulty, Ideology, Maturity, TextProfile, Topic } from './textProfile.js'
-import { StoriesIndex, getStoriesIndex } from './storiesIndex.js'
+import { getStoriesIndex } from './storiesIndex/index.js'
+import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
 import { loadText, loadProfile, getProfilePath } from './reader.js'
-import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q } from './config.js'
+import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT } from './config.js'
 import { compileRegexp } from './stringUtil.js'
 /**
  * @typedef {import('pino').Logger} Logger
@@ -18,12 +19,6 @@ import { compileRegexp } from './stringUtil.js'
  */
 let logger
 
-/**
- * tag-tag connection type for parent to child.
- * @type {string}
- */
-export const TYPE_TO_TAG_CHILD = RelationalTagConnection.TYPE_TO_TAG_CHILD
-export const TYPE_TO_TAG_PARENT = RelationalTagConnection.inverse_type(TYPE_TO_TAG_CHILD)
 /**
  * Prefix of an ISO timestamp to use for date-value tags.
  * @type {number}

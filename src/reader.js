@@ -18,7 +18,7 @@ import {
   IDEOLOGIES_MAX as _ideologiesMax,
   IDEOLOGY_EXAMPLES_MAX as _ideologyExamplesMax
 } from './config.js'
-import { StoriesIndex } from './storiesIndex.js'
+import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { downloadWebpage, fileExists, initDir, writeText } from './writer.js'
 import { IndexPage } from './indexPage.js'

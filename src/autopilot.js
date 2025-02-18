@@ -1,5 +1,5 @@
 import { StorySummary } from './storySummary.js'
-import { getStoriesIndex } from './storiesIndex.js'
+import { getStoriesIndex } from './storiesIndex/index.js'
 import { IndexPage } from './indexPage.js'
 import { main } from './main.js'
 import { listStoryIndexPages, loadStories } from './reader.js'

@@ -1,6 +1,8 @@
 import { RelationalTag } from 'relational_tags'
+import { TYPE_TO_TAG_CHILD } from './config.js'
 import { LibraryDescriptor } from './libraryDescriptor.js'
-import { TYPE_TO_TAG_CHILD, getDateTag, getTextTag } from './library.js'
+import { getDateTag, getTextTag } from './library.js'
+
 
 export class StorySummary extends LibraryDescriptor {
   static get tAuthorName() { return  RelationalTag.new('author-name') }
