@@ -681,7 +681,7 @@ export class Library extends LibraryDescriptor {
         // I think we could use Map.intersection here, but perfer to loop through manually to yield on demand
         for (let book of booksA.keys()) {
           if (booksB.has(book)) {
-            yield [book, booksA[book]]
+            yield [book, booksA.get(book)]
           }
           // else, not within intersection
         }
@@ -940,7 +940,7 @@ export class LibraryBook extends LibraryDescriptor {
     yield `${indent}index=${this.index} index-page=${this.indexPage.pageNumber} \n`
 
     if (this.profile !== undefined) {
-      yield `${indent}text-profile.file-path="${this.profile.filePath}"\n`
+      yield `${indent}text-profile.file-path=[${this.profile.filePath}]\n`
       yield `${indent}reading-level=${this.profile.difficulty?.readingLevelName} `
         + `years-of-education=${this.profile.difficulty?.yearsOfEducation}\n`
 
@@ -966,7 +966,7 @@ export class LibraryBook extends LibraryDescriptor {
       yield searchPath.map((conn) => {
         // path to book only includes connections to tags
         return (conn.weight !== null ? `[${conn.weight}]` : '') + conn.target.name
-      }).join('.')
+      }).join('.') + '\n'
     }
   }
 
