@@ -1260,11 +1260,21 @@ Generates `data/renders/library_tags.txt`. Viewing this file we can see tags und
 
 ### Search by tag
 
+Searches are performed by adding conditions to the `-L <format>` option.
+
+#### Single condition
+
 View the stories with lowest reading level.
 
 ```shell
 [opts]: -L txt -t years-of-education -> asc
 ```
+
+#### Composite condition
+
+Tag values are singular and unique strings. Determining whether tag `globalist` should refer to a `difficult-word` or an `ideology` depends on from which parent/ancestor tag you are searching. That is the primary function of a search condition being a composite of `-t` (the ancestor tag) and `-q` (the tag pattern applied to its descendants).
+
+Examples below.
 
 View stories whose author name contains `"rob"`.
 
@@ -1282,6 +1292,41 @@ View latest stories published in the year 2007.
 
 ```shell
 [opts]: -L txt -t publish-date -q /2007-.+/ -> desc
+```
+
+#### Search expression
+
+Instead of the more limited `-t` and `-q` opts, `-?` defines an expression that combines any number of the conditions that `-t` and `-q` provide.
+
+When the search expression contains logical operators (set operations), sort is currently applied as follows.
+
+- On intersect `&&`, sort is applied to the first set.
+- On union `||`, sort is applied to each set individually before they are combined.
+
+##### Search expr syntax
+
+| token | description |
+| --- | --- |
+| `t` | Tag name variable, for exact match. |
+| `q` | Tag name pattern/query variable, for regexp match. |
+| `==` | Separator between `t/q` and the literal value. |
+| `^` | Separator within a composite condition between the `t` and `q` conditions. |
+| `&&` | Logical operator AND. Behaves like set intersection. |
+| <code>&#124;&#124;</code> | Logical operator OR. Behaves like set union. |
+| `()` | Grouping operator. Optionally surround any expression with parentheses. |
+
+##### Search expr examples
+
+View stories with profile having `difficulty.years-of-education` that belong to stories index `문장웹진`.
+
+```shell
+[opts]: -? "(t == 'difficulty' ^ q == 'years-of-education') && (t == 'index-name' ^ q == '문장웹진')" -L txt
+```
+
+View stories either by author `harriet hepping` or having `harriet` in the title.
+
+```shell
+[opts]: -? "t == 'author-name' ^ q == 'harriet hepping' || t == 'title' ^ q == '/.*harriet.*/'" -L txt
 ```
 
 ## Terms
@@ -1315,8 +1360,9 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 | `-0, --skip-profile` | Even if a story is selected, do not generate a profile for it. | `-s` |
 | `-a, --autopilot` | Continue to cycle through stories and pages without pausing for input until `-m` is reached. Combine with `-i`, `-p`, `-s` opts to specify from which story to begin. | `-s` |
 | `-L, --show-library` | Show library (fetched stories, profiles, indexes, etc). Combine with other opts to only show a subset of items.<ul><li>`tag` = Print flat list of all available tags for searching. This is a good way to get an idea of how the stories are organized. Filters like `-t` and `-q` are not applicable here.</li><li>`txt` = Print flat list of books to a plain text file. </li><li>`md` = Render as a markdown file.</li><li>`html` [pending] = Render as a local webpage.</li></ul> | |
-| `-t, --tag` | Tag name for limiting library items. If combined with `-q`, functions like a | `-L` |
-| `-q, --query` | Query string for limiting library items by tag pattern. Surround with slashes like `/\w+e/` to search using a regular expression. Note that currently the regexp must match the whole tag name, not a substring. | `-L` |
+| `-t, --tag` | Tag name for searching library items. If combined with `-q`, defines the parent tag under which search is performed. | `-L` |
+| `-q, --query` | Tag name pattern as a query string for searching library items. Surround with slashes like `/\w+e/` to search using a regular expression. Note that currently the regexp must match the whole tag name, not a substring. | `-L` |
+| `-?, --search-expr` | Library search expression with support for logical operators. Syntax is described in more detail below. Replaces `-t` and `-q` for more advanced searches. | `-L` |
 | `->, --sort` | Sort direction of search results. Ex. `-t years-of-education -> asc` will sort easiest texts first, and `-> desc` hardest first. | `-L` |
 | `-d, --stories-dir` | Local filesystem directory where story lists and texts are saved. | |
 | `-D, --profiles-dir` | Local directory where story profiles are saved. | |
@@ -1327,6 +1373,10 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 For `--story`, instead of providing a story id, you can also use variable expressions `@first` for the first story in the page, `@next` for the next story in the page, or `@<array-index>` for the story at a given index within the page stories array. `@first` and `@0` are equivalent.
 
 Similarly for `--page`, instead of providing a page number, you can also use variable expressions `@first` for the first page in the stories index, or `@next` for the next page. If used with `-f`, then `@next` is **the next page after the last** one already in the local filesystem, instead of the next after the most recently used page.
+
+`-L` is used to explore the library.
+Combine with `-t` (tag name), `-q`, (tag name pattern), or both (composite of ancestor tag and descendant tag pattern) to define the filter condition. 
+Or, combine with `-?` (search expression) for more complex searches. See [Browse library > Search by tag > Search expression](#search-expression) for details.
 
 # Development
 
