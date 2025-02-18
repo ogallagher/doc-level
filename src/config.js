@@ -23,11 +23,11 @@ export const OPT_VAR_NEXT = 'next'
 /**
  * Operator used for logical AND in a library search expression.
  */
-export const SEARCH_OP_AND = '&'
+export const SEARCH_OP_AND = '&&'
 /**
  * Operator used for logical OR in a library search expression.
  */
-export const SEARCH_OP_OR = '|'
+export const SEARCH_OP_OR = '||'
 /**
  * Operator used for combining/delimiting t and q terms in a library search expression.
  */

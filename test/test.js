@@ -474,7 +474,7 @@ describe('library', () => {
       })
 
       it('handles AND/intersection set operation', () => {
-        let searchExpr = `(t == 'publish-date' ^ q == '/2000-.+/') & (t == 'title' ^ q == '/.+a-or-b/')`
+        let searchExpr = `t == 'publish-date' ^ q == '/2000-.+/' && t == 'title' ^ q == '/.+a-or-b/'`
         let res = [...library.execSearchExpression(searchExpr, 'asc')]
         assert.strictEqual(res.length, 2)
         res.forEach(([book, _bookPath]) => {
@@ -484,7 +484,7 @@ describe('library', () => {
       })
 
       it('handles OR/union set operation', () => {
-        let searchExpr = `(t == 'publish-date' ^ q == '/2000-01.+/') | (t == 'publish-date' ^ q == '/2000-02.+/')`
+        let searchExpr = `t == 'publish-date' ^ q == '/2000-01.+/' || t == 'publish-date' ^ q == '/2000-02.+/'`
         let res = [...library.execSearchExpression(searchExpr, 'asc')]
         assert.strictEqual(res.length, 2)
         res.forEach(([book, _bookPath]) => {
