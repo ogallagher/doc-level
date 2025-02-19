@@ -30,6 +30,8 @@ export class MunjangStoriesIndex extends StoriesIndex {
     'blockquote'
   ].join(',')
 
+  static excerptAuthorRegexp = /\s+([가-힣]{2,})\s+/
+
   constructor() {
     let url = new URL('https://munjang.or.kr/board.es')
     url.searchParams.set('act', 'list')
@@ -70,29 +72,38 @@ export class MunjangStoriesIndex extends StoriesIndex {
         MunjangStoriesIndex.logger.info('stories[%s] title-author=%s', idx, titleAuthor)
 
         const splitIdx = titleAuthor.indexOf('-')
-        if (splitIdx === -1) {
-          // Convention of embedding of author name in the title of the story is not always followed.
-          // In this case, 
-          MunjangStoriesIndex.logger.info('author not present in title-author=%s', titleAuthor)
-        }
 
         let author = titleAuthor.substring(0, splitIdx)
-
         const title = titleAuthor.substring(splitIdx + 1)
         MunjangStoriesIndex.logger.debug('stories[%s] title.raw=%s author.raw=%s', idx, title, author)
 
         const meta = storyEl.querySelector(MunjangStoriesIndex.selectorMeta)
-        const excerpt = storyEl.querySelector(
-          MunjangStoriesIndex.selectorExcerpt
-        ).textContent
+
+        const excerpt = storyEl.querySelector(MunjangStoriesIndex.selectorExcerpt).textContent
           .replace(/&lsquo.+&rsquo;\s+/, '')
           .replace(/광고 건너뛰기▶｜\s+/, '')
           .replaceAll(/[\r\n]+\s+/g, ' ')
           .trim()
 
         if (splitIdx === -1) {
-          MunjangStoriesIndex.logger.debug('title=%s does not contain author; get from start of excerpt')
-          author = excerpt.substring(0, excerpt.search(/\s/))
+          MunjangStoriesIndex.logger.debug(
+            'title=%s does not contain author; get from start of excerpt after title'
+          )
+
+          const titleEndIdx = excerpt.indexOf(title) + title.length
+          const authorMatcher = MunjangStoriesIndex.excerptAuthorRegexp.exec(excerpt.substring(titleEndIdx))
+          
+          if (authorMatcher !== null) {
+            author = authorMatcher[1]
+          }
+          else {
+            throw new Error(
+              'failed to parse author name from stories[%s] title-author=%s excerpt=%s', 
+              idx, 
+              titleAuthor,
+              excerpt
+            )
+          }
         }
 
         const url = new URL(path.join(
