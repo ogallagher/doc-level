@@ -7,7 +7,7 @@ import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
 import { loadText, loadProfile, getProfilePath } from './reader.js'
-import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT } from './config.js'
+import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT, SEARCH_OP_NEQ } from './config.js'
 import { compileRegexp } from './stringUtil.js'
 /**
  * @typedef {import('pino').Logger} Logger
@@ -588,7 +588,7 @@ export class Library extends LibraryDescriptor {
    * They are not noted in param type hint, but `a` and `b` can also be nested group expressions,
    * each with a single term.
    * 
-   * @returns `[startTag, query]`
+   * @returns {[string, RelationalTag|undefined, string|RegExp|undefined]} `[op, t, q]`.
    */
   static getSearchCondition([eq, a, b]) {
     // resolve extra nested groups
@@ -618,11 +618,11 @@ export class Library extends LibraryDescriptor {
     }
 
     if (a === SEARCH_T) {
-      return [RelationalTag.get(b[1]), undefined]
+      return [eq, RelationalTag.get(b[1]), undefined]
     }
     else if (a === SEARCH_Q) {
       let bRegexp = compileRegexp(b[1])
-      return [undefined, bRegexp === undefined ? b[1] : bRegexp]
+      return [eq, undefined, bRegexp === undefined ? b[1] : bRegexp]
     }
     else {
       throw new Error(
@@ -706,8 +706,8 @@ export class Library extends LibraryDescriptor {
     }
     else if (op === SEARCH_OP_COMPOSE) {
       // composite condition (tag + query)
-      let [t1, q1] = Library.getSearchCondition(a, sort)
-      let [t2, q2] = Library.getSearchCondition(b, sort)
+      let [op1, t1, q1] = Library.getSearchCondition(a, sort)
+      let [op2, t2, q2] = Library.getSearchCondition(b, sort)
 
       if (t1 !== undefined && t2 !== undefined) {
         throw new Error(
@@ -719,24 +719,29 @@ export class Library extends LibraryDescriptor {
           `1 composite condition ${expr} cannot define 2 tag patterns/queries`
         )
       }
-      else if (t1 !== undefined) {
-        for (let res of this.getBooks(t1, q2, sort)) {
-          yield res
-        }
-      }
       else {
-        for (let res of this.getBooks(t2, q1, sort)) {
+        for (let res of this.getBooks(
+          t1 !== undefined ? t1 : t2, 
+          t1 !== undefined ? q2 : q1, 
+          sort, 
+          op1 === SEARCH_OP_NEQ, 
+          op2 === SEARCH_OP_NEQ
+        )) {
           yield res
         }
       }
     }
-    else if (op === SEARCH_OP_EQ) {
+    else if (op === SEARCH_OP_EQ || op === SEARCH_OP_NEQ) {
       // single condition
-      let [t, q] = Library.getSearchCondition(expr, sort)
+      let [_op, t, q] = Library.getSearchCondition(expr, sort)
       if (t === undefined) {
         t = this
       }
-      for (let res of this.getBooks(t, q, sort)) {
+      for (let res of this.getBooks(
+        t, q, sort, 
+        t !== undefined && op === SEARCH_OP_NEQ,
+        q !== undefined && op === SEARCH_OP_NEQ
+      )) {
         yield res
       }
     }
@@ -790,12 +795,11 @@ export class Library extends LibraryDescriptor {
       logger.info('found %s exclude tags matching query %s', excludeQueryTagCount, query)
     }
     
-    if (query === undefined) {
-      if (!excludeStartTag) {
-        includeTags.set(startTag, [])
-      }
+    if ((query === undefined || excludeQuery) && startTag !== undefined && !excludeStartTag) {
+      includeTags.set(startTag, [])
     }
-    else if (!excludeQuery) {
+    
+    if (query !== undefined && !excludeQuery) {
       let _startTag = excludeStartTag ? Library.t : startTag
       let includeQueryTagCount = 0
       for (let [tag, pathToTag] of RelationalTag._search_descendants(

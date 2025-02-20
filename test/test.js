@@ -2,7 +2,7 @@ import assert from 'assert'
 import pino from 'pino'
 import path from 'path'
 import { RelationalTag as rt } from 'relational_tags'
-import { TYPE_TO_TAG_CHILD } from '../src/config.js'
+import { TYPE_TO_TAG_CHILD, patchSubscript } from '../src/config.js'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
@@ -23,6 +23,7 @@ const logger = pino(
   }
 )
 
+patchSubscript()
 await libraryInit(logger)
 await siInit(logger)
 await mainInit(logger)
@@ -502,6 +503,14 @@ describe('library', () => {
         assert.strictEqual(res[0][0].story.id, 'aa')
       })
 
+      it('handles single negative conditions', () => {
+        // publish-date.2000-01-01
+        let searchExpr = `t != '2000-01-01'`
+        let res = [...library.execSearchExpression(searchExpr, undefined)].map(([b, _p]) => b)
+        assert.strictEqual(res.length, 4)
+        assert.strictEqual(res.indexOf(bookA), -1)
+      })
+
       it('handles composite conditions', () => {
         // publish-date in year 2000
         let searchExpr = `t == 'publish-date' ^ q == '/2000-.+/'`
@@ -517,6 +526,24 @@ describe('library', () => {
         assert.strictEqual(res.length, 3)
         res.forEach(([book, _bookPath]) => {
           assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
+        })
+      })
+
+      it('handles composite negative conditions', () => {
+        // publish-date in year 2000, author not bailey
+        let searchExpr = `t != 'bailey buchemi' ^ q == '/2000-.+/'`
+        let res = [...library.execSearchExpression(searchExpr, 'asc')]
+        assert.strictEqual(res.length, 2)
+        res.forEach(([book, _bookPath]) => {
+          assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
+        })
+
+        // handle redundant nested groups, publish-date not 2000
+        searchExpr = `((((t == 'publish-date'))) ^ ((q) != ('/2000-.+/')))`
+        res = [...library.execSearchExpression(searchExpr, 'asc')]
+        assert.strictEqual(res.length, 1)
+        res.forEach(([book, _bookPath]) => {
+          assert.notStrictEqual(book.story.publishDate.getUTCFullYear(), 2000)
         })
       })
 
@@ -536,7 +563,17 @@ describe('library', () => {
         assert.strictEqual(res.length, 2)
         res.forEach(([book, _bookPath]) => {
           assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
-          assert.notStrictEqual(book.story.publishDate.getUTCMonth(), 3)
+          assert.notStrictEqual(book.story.publishDate.getUTCMonth()+1, 3)
+        })
+      })
+      
+      it('handles AND,OR with negative conditions', () => {
+        let searchExpr = `t == 'publish-date' ^ q != '/2000-01.+/' && t == 'publish-date' ^ q == '/2000-.+/'`
+        let res = [...library.execSearchExpression(searchExpr, 'asc')]
+        assert.strictEqual(res.length, 2)
+        res.forEach(([book, _bookPath]) => {
+          assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
+          assert.notStrictEqual(book.story.publishDate.getUTCMonth()+1, 1)
         })
       })
     })

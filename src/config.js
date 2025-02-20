@@ -9,6 +9,8 @@ import path from 'path'
 import { hideBin } from 'yargs/helpers'
 import { compileRegexp } from './stringUtil.js'
 import { RelationalTagConnection } from 'relational_tags'
+import { binary, operator, compile } from 'subscript'
+import { PREC_EQ } from 'subscript/const'
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {import('./storiesIndex/storiesIndex.js').StoriesIndex} StoriesIndex
@@ -41,6 +43,10 @@ export const SEARCH_OP_AND = '&&'
  */
 export const SEARCH_OP_OR = '||'
 /**
+ * Operator used for logical NOT (set difference/complement) in a library search expression.
+ */
+export const SEARCH_OP_NOT = '-'
+/**
  * Operator used for combining/delimiting t and q terms in a library search expression.
  */
 export const SEARCH_OP_COMPOSE = '^'
@@ -48,6 +54,10 @@ export const SEARCH_OP_COMPOSE = '^'
  * Operator used for pairing t,q variables with do-match values in a library search expression.
  */
 export const SEARCH_OP_EQ = '=='
+/**
+ * Operator used for pairing t,q variables with no-match values in a library search expression.
+ */
+export const SEARCH_OP_NEQ = '!='
 /**
  * Operator used to group terms and control order of operations in a library search expression.
  */
@@ -350,6 +360,14 @@ function loadEnv() {
 }
 
 /**
+ * Customize subscript expression parser.
+ */
+export function patchSubscript() {
+  binary('!=', PREC_EQ)
+  operator('!=', (a, b) => b && (a = compile(a), b = compile(b), ctx => a(ctx) != b(ctx)))
+}
+
+/**
  * Init module logger, init filesystem, load env args, connect OpenAI api client.
  * 
  * @param {Logger} parentLogger 
@@ -370,6 +388,8 @@ export function init(parentLogger) {
       name: 'config'
     }
   )
+
+  patchSubscript()
 
   return loadEnv()
   .then((resEnv) => {
