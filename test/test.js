@@ -15,6 +15,9 @@ import { IndexPage } from '../src/indexPage.js'
 import { StorySummary } from '../src/storySummary.js'
 import { LibraryDescriptor } from '../src/libraryDescriptor.js'
 import { resolvePageVar, resolveStoryVar, init as mainInit } from '../src/main.js'
+/**
+ * @typedef {import('relational_tags').RelationalTagConnection} RelationalTagConnection
+ */
 
 const logger = pino(
   {
@@ -591,6 +594,38 @@ describe('library', () => {
         res.forEach(([book, _bookPath]) => {
           assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
         })
+      })
+
+      it('matches satisfies set operation identities', () => {
+        /**
+         * 
+         * @param {Generator<[LibraryBook, RelationalTagConnection[]]>} res
+         */
+        function prepareSearchResult(res) {
+          return [...res].map(([b, _p]) => b).sort((a,b) => a.story.id.localeCompare(b.story.id))
+        }
+
+        for (let [seA, seB] of [
+          // c1 - c2 === c1 && -c2
+          [
+            `(t == 'publish-date' ^ q == '/2000-.+/') - (t == 'bailey buchemi')`,
+            `(t == 'publish-date' ^ q == '/2000-.+/') && -(t == 'bailey buchemi')`
+          ],
+          // c1 || -c2 === -(c2 - c1)
+          [
+            `(q == '/2000-.+/') || -(t == 'bailey buchemi')`,
+            `-((t == 'bailey buchemi') - (q == '/2000-.+/'))`
+          ],
+          // -(c2 - c1) === -c2 || (c1 && c2)
+          [
+            `-((q == '/2000-.+/') - (t == 'bailey buchemi'))`,
+            `-(q == '/2000-.+/') || (t == 'bailey buchemi' && q == '/2000-.+/')`
+          ]
+        ]) {
+          let resA = prepareSearchResult(library.execSearchExpression(seA))
+          let resB = prepareSearchResult(library.execSearchExpression(seB))
+          assert.deepStrictEqual(resA, resB)
+        }
       })
     })
   })
