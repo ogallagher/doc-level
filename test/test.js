@@ -576,6 +576,22 @@ describe('library', () => {
           assert.notStrictEqual(book.story.publishDate.getUTCMonth()+1, 1)
         })
       })
+
+      it('handles NOT set complement and difference', () => {
+        // complement of publish-date.2000-01-01
+        let searchExpr = `-(t == '2000-01-01')`
+        let res = [...library.execSearchExpression(searchExpr, undefined)].map(([b, _p]) => b)
+        assert.strictEqual(res.length, 4)
+        assert.strictEqual(res.indexOf(bookA), -1)
+
+        // publish-date in year 2000, author not bailey
+        searchExpr = `(t == 'publish-date' ^ q == '/2000-.+/') - (t == 'bailey buchemi')`
+        res = [...library.execSearchExpression(searchExpr)]
+        assert.strictEqual(res.length, 2)
+        res.forEach(([book, _bookPath]) => {
+          assert.strictEqual(book.story.publishDate.getUTCFullYear(), 2000)
+        })
+      })
     })
   })
 

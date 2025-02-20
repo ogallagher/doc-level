@@ -7,11 +7,12 @@ import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
 import { loadText, loadProfile, getProfilePath } from './reader.js'
-import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT, SEARCH_OP_NEQ } from './config.js'
+import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT, SEARCH_OP_NEQ, SEARCH_OP_NOT } from './config.js'
 import { compileRegexp } from './stringUtil.js'
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {Array<string|SearchExpression>} SearchExpression Multi term expression.
+ * @typedef {import('relational_tags').RelationalTagConnection} RelationalTagConnection
  */
 
 /**
@@ -663,32 +664,39 @@ export class Library extends LibraryDescriptor {
         yield res
       }
     }
-    else if (op === SEARCH_OP_AND || op === SEARCH_OP_OR) {
+    else if (op === SEARCH_OP_NOT && b === undefined) {
+      // unary set complement
+      let booksNot = new Map([...this.execSearchExpression(a, undefined)])
+      for (let book of this.books.values()) {
+        if (!booksNot.has(book)) {
+          yield [book, []]
+        }
+      }
+    }
+    else if (op === SEARCH_OP_AND || op === SEARCH_OP_OR || (op === SEARCH_OP_NOT && b !== undefined)) {
       // set operations
+      // I think we could use Map.<set-operation> here, but prefer to loop through manually to yield on demand
       let resA = this.execSearchExpression(a, sort)
       let resB = this.execSearchExpression(b, sort)
 
       if (op === SEARCH_OP_AND) {
         // AND = set intersection
-        let booksA = new Map([...resA])
         let booksB = new Map([...resB])
-
-        // I think we could use Map.intersection here, but prefer to loop through manually to yield on demand
-        for (let book of booksA.keys()) {
+        
+        for (let [book, _pathToBook] of resA) {
           if (booksB.has(book)) {
-            yield [book, booksA.get(book)]
+            yield [book, _pathToBook]
           }
           // else, not within intersection
         }
       }
-      else {
+      else if (op === SEARCH_OP_OR) {
         // OR = set union
         /**
          * @type {Set<LibraryBook>}
          */
         let books = new Set()
         
-        // I think we could use Map.union here, but prefer to loop through manually to yield on demand
         for (let [book, path] of resA) {
           if (!books.has(book)) {
             books.add(book)
@@ -701,6 +709,18 @@ export class Library extends LibraryDescriptor {
             books.add(book)
             yield [book, path]
           }
+        }
+      }
+      else {
+        // NOT = set difference
+        let booksB = new Map([...resB])
+
+        // I think we could use Map.intersection here, but prefer to loop through manually to yield on demand
+        for (let [book, _pathToBook] of resA) {
+          if (!booksB.has(book)) {
+            yield [book, _pathToBook]
+          }
+          // else, not within intersection
         }
       }
     }
