@@ -33,11 +33,11 @@ export const OPT_VAR_PREFIX = '@'
 export const OPT_VAR_FIRST = 'first'
 export const OPT_VAR_NEXT = 'next'
 /**
- * Operator used for logical AND in a library search expression.
+ * Operator used for logical AND (set intersect) in a library search expression.
  */
 export const SEARCH_OP_AND = '&&'
 /**
- * Operator used for logical OR in a library search expression.
+ * Operator used for logical OR (set union) in a library search expression.
  */
 export const SEARCH_OP_OR = '||'
 /**
@@ -45,7 +45,7 @@ export const SEARCH_OP_OR = '||'
  */
 export const SEARCH_OP_COMPOSE = '^'
 /**
- * Operator used for pairing t,q variables with values in a library search expression.
+ * Operator used for pairing t,q variables with do-match values in a library search expression.
  */
 export const SEARCH_OP_EQ = '=='
 /**
@@ -78,7 +78,7 @@ export const TOPICS_MAX = 6
 export const TOPIC_EXAMPLES_MAX = 10
 export const IDEOLOGIES_MAX = 6
 export const IDEOLOGY_EXAMPLES_MAX = 10
-export const SEARCH_TAGS_MAX = 10
+export const SEARCH_TAGS_MAX = 500
 export const SEARCH_TAG_BOOKS_MAX = 1000
 
 /**

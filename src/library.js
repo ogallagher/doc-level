@@ -751,44 +751,86 @@ export class Library extends LibraryDescriptor {
    * @param {RelationalTag} startTag Tag from which to search.
    * @param {string|RegExp|undefined} query Search query.
    * @param {string|undefined} sort Sort direction. 
+   * @param {boolean} excludeStartTag Whether the provided `startTag` should be excluded (negative condition).
+   * @param {boolean} excludeQuery Whether tags matching the provided `query` should be excluded (negative condition).
    * 
    * @returns {Generator<[LibraryBook, RelationalTagConnection[]]>}
    */
-  *getBooks(startTag, query, sort) {
+  *getBooks(startTag, query, sort, excludeStartTag=false, excludeQuery=false) {
     /**
-     * Matched items and the tags graph path to each.
-     * @type {Map<RelationalTag, RelationalTagConnection[]>}
+     * Matched tags and the graph path to each.
+     * @type {Map<RelationalTag, RelationalTagConnection[]>|[RelationalTag, RelationalTagConnection[]][]}
      */
-    let resultTags
-    
-    if (query === undefined ) {
-      resultTags = new Map([[startTag, []]])
+    let includeTags = new Map()
+    /**
+     * Matched tags and the graph path to each, whose books should be excluded
+     * @type {Set<RelationalTag>}
+     */
+    const excludeTags = new Set()
+
+    // populate tags to include and exclude
+    if (excludeStartTag) {
+      excludeTags.add(startTag)
     }
-    else {
-      resultTags = RelationalTag._search_descendants(
+
+    if (excludeQuery) {
+      let excludeQueryTagCount = 0
+      for (let tag of RelationalTag._search_descendants(
         // from root
-        startTag,
+        Library.t,
         // to descendants
         TYPE_TO_TAG_CHILD,
-        // exclude entities, include tags
+        // only tags
         false, true,
         query
-      )
-      logger.info('under parent %s found %s tags matching query %s', startTag.name, resultTags.size, query)
-      if (resultTags.size === 0) {
-        logger.error('no tags found under parent tag %s matching query %s', startTag.name, query)
+      ).keys()) {
+        excludeTags.add(tag)
+        excludeQueryTagCount++
+      }
+      logger.info('found %s exclude tags matching query %s', excludeQueryTagCount, query)
+    }
+    
+    if (query === undefined) {
+      if (!excludeStartTag) {
+        includeTags.set(startTag, [])
+      }
+    }
+    else if (!excludeQuery) {
+      let _startTag = excludeStartTag ? Library.t : startTag
+      let includeQueryTagCount = 0
+      for (let [tag, pathToTag] of RelationalTag._search_descendants(
+        // from ancestor
+        _startTag,
+        // to descendants
+        TYPE_TO_TAG_CHILD,
+        // only tags
+        false, true,
+        query
+      ).entries()) {
+        includeTags.set(tag, pathToTag)
+        includeQueryTagCount++
+      }
+      logger.info('under parent %s found %s include tags matching query %s', _startTag.name, includeQueryTagCount, query)
+      if (includeTags.size === 0) {
+        logger.error('no tags found under parent tag %s matching query %s', _startTag.name, query)
         return
       }
     }
 
-    // sort result tags
-    /**
-     * @type {[RelationalTag, RelationalTagConnection[]][]|undefined}
-     */
-    let sortedTags
+    // remove tags connected to excluded start tags
+    if (excludeStartTag) {
+      for (let includeTag of [...includeTags.keys()]) {
+        if (RelationalTag._search_descendants(startTag, TYPE_TO_TAG_CHILD, false, true, includeTag.name).size > 0) {
+          logger.debug('exclude tag %s connected to ancestor %s', includeTag, startTag)
+          includeTags.delete(includeTag)
+        }
+      }
+    }
+
+    // sort include tags. If sorted, converts to ordered array.
     if (sort !== undefined) {
-      sortedTags = Library.sortSearchItems(resultTags, sort)
-      logger.debug('sorted tags %s with first=%s', sort, )
+      includeTags = Library.sortSearchItems(includeTags, sort)
+      logger.debug('sorted include tags %s', sort)
     }
 
     // convert tags to books
@@ -804,11 +846,23 @@ export class Library extends LibraryDescriptor {
      * @type {Set<LibraryBook>}
      */
     let resultBooks = new Set()
+
+    // if no include tags defined, start with set of all books and remove results of excludeTags
+    let excludeWithoutInclude = (includeTags.size === 0 && excludeTags.size > 0)
+    if (excludeWithoutInclude) {
+      resultBooks = new Set(this.books.values())
+    }
+    // else, connections to excludeTags were already removed from includeTags
+
     let t = 0
-    for (let [startTag, pathToStartTag] of (sort !== undefined ? sortedTags : resultTags.entries())) {
-      if (t < SEARCH_TAGS_MAX) {
+    for (
+      let [startTag, pathToStartTag] of (
+        excludeWithoutInclude ? excludeTags.entries() : (sort !== undefined ? includeTags : includeTags.entries())
+      )
+    ) {
+      if (t < SEARCH_TAGS_MAX || excludeWithoutInclude) {
         /**
-         * @type {Map<LibraryDescriptor, RelationalTagConnection[]>}
+         * @type {Map<LibraryDescriptor, RelationalTagConnection[]>|[LibraryDescriptor, RelationalTagConnection[]][]}
          */
         let descriptors = RelationalTag._search_descendants(
           startTag, 
@@ -821,34 +875,51 @@ export class Library extends LibraryDescriptor {
           new Set(resultDescriptors)
         )
 
-        // sort result descriptors
-        /**
-         * @type {[LibraryDescriptor, RelationalTagConnection[]][]|undefined>}
-         */
-        let sortedDescriptors
-        if (sort !== undefined) {
-          sortedDescriptors = Library.sortSearchItems(descriptors, sort)
+        if (!excludeWithoutInclude) {
+          // remove descriptors connected to excluded tags
+          for (let descriptor of [...descriptors.keys()]) {
+            for (let excludeTag of excludeTags.values()) {
+              if (RelationalTag.search_tags_of_entity(descriptor, excludeTag.name, TYPE_TO_TAG_PARENT, false).length > 0) {
+                logger.debug('exclude descriptor %s connected to %s', descriptor, excludeTag)
+                descriptors.delete(descriptor)
+              }
+            }
+          }
+
+          // sort result descriptors
+          if (sort !== undefined) {
+            descriptors = Library.sortSearchItems(descriptors, sort)
+          }
         }
 
         let b = 0
-        for (let [descriptor, pathToDescriptor] of (sort !== undefined ? sortedDescriptors : descriptors.entries())) {
-          if (b < SEARCH_TAG_BOOKS_MAX) {
+        for (
+          let [descriptor, pathToDescriptor] of (
+            (sort !== undefined && !excludeWithoutInclude) ? descriptors : descriptors.entries()
+          )
+        ) {
+          if (b < SEARCH_TAG_BOOKS_MAX || excludeWithoutInclude) {
             resultDescriptors.add(descriptor)
             const book = LibraryBook.getBook(descriptor)[0]
             
             // some descriptors do not belong to books (ex StoriesIndex)
-            if (book !== undefined && !resultBooks.has(book)) {
-              resultBooks.add(book)
+            if (book !== undefined) {
+              if (excludeWithoutInclude) {
+                resultBooks.delete(book)
+              }
+              else if (!resultBooks.has(book)) {
+                resultBooks.add(book)
               
-              yield [
-                book,
-                pathToStartTag
-                .concat(
-                  // remove initial recursive connection when linking to end first path
-                  pathToDescriptor.filter((conn) => conn.source !== conn.target)
-                )
-                .filter((conn) => conn.target instanceof RelationalTag)
-              ]
+                yield [
+                  book,
+                  pathToStartTag
+                  .concat(
+                    // remove initial recursive connection when linking to end first path
+                    pathToDescriptor.filter((conn) => conn.source !== conn.target)
+                  )
+                  .filter((conn) => conn.target instanceof RelationalTag)
+                ]
+              }
             }
           }
           else {
@@ -863,6 +934,14 @@ export class Library extends LibraryDescriptor {
         break
       }
       t++
+    }
+
+    // return all books that were not excluded
+    if (excludeWithoutInclude) {
+      logger.info('yield %s non excluded result books without tag paths', resultBooks.size)
+      for (let book of resultBooks.values()) {
+        yield [book, []]
+      }
     }
   }
 

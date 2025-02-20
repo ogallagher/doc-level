@@ -400,6 +400,50 @@ describe('library', () => {
           'only 1 book has a profile.difficulty'
         )
       })
+
+      it('handles negative conditions', () => {
+        // -t
+        /**
+         * @type {LibraryBook[]}
+         */
+        let res = [
+          ...library.getBooks(rt.get('aaron abalone'), undefined, undefined, true, false)
+        ].map(([book, _pathToBook]) => book)
+        assert.strictEqual(res.indexOf(bookA), -1)
+        assert.strictEqual(res.length, 4)
+
+        // -q
+        res = [
+          ...library.getBooks(undefined, /.+a-or-b/, undefined, false, true)
+        ].map(([book, _pathToBook]) => book)
+        assert.strictEqual(res.indexOf(bookA), -1)
+        assert.strictEqual(res.indexOf(bookB), -1)
+        assert.strictEqual(res.length, 3)
+
+        // -t -q
+        res = [
+          ...library.getBooks(rt.get('carolina chezer'), /.+a-or-b/, undefined, true, true)
+        ].map(([book, _pathToBook]) => book)
+        assert.strictEqual(res.indexOf(bookA), -1)
+        assert.strictEqual(res.indexOf(bookB), -1)
+        assert.strictEqual(res.indexOf(bookC), -1)
+        assert.strictEqual(res.length, 2)
+
+        // +t -q
+        res = [
+          ...library.getBooks(rt.get('author-name'), /.+a-or-b/, undefined, false, true)
+        ].map(([book, _pathToBook]) => book)
+        assert.strictEqual(res.indexOf(bookA), -1)
+        assert.strictEqual(res.indexOf(bookB), -1)
+        assert.strictEqual(res.length, 3)
+
+        // -t +q
+        res = [
+          ...library.getBooks(rt.get('2000-01-01'), /.+a-or-b/, undefined, true, false)
+        ].map(([book, _pathToBook]) => book)
+        assert.notStrictEqual(res.indexOf(bookB), -1)
+        assert.strictEqual(res.length, 1)
+      })
     })
 
     describe('#addBook', () => {
