@@ -611,6 +611,11 @@ describe('library', () => {
             `(t == 'publish-date' ^ q == '/2000-.+/') - (t == 'bailey buchemi')`,
             `(t == 'publish-date' ^ q == '/2000-.+/') && -(t == 'bailey buchemi')`
           ],
+          // c1 && -c2 === c1 && c2[!=]
+          [
+            `(t == 'publish-date' ^ q == '/2000-.+/') && -(t == 'bailey buchemi')`,
+            `(t == 'publish-date' ^ q == '/2000-.+/') && (t != 'bailey buchemi')`
+          ],
           // c1 || -c2 === -(c2 - c1)
           [
             `(q == '/2000-.+/') || -(t == 'bailey buchemi')`,

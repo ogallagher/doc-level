@@ -1309,10 +1309,12 @@ When the search expression contains logical operators (set operations), sort is 
 | --- | --- |
 | `t` | Tag name variable, for exact match. |
 | `q` | Tag name pattern/query variable, for regexp match. |
-| `==` | Separator between `t/q` and the literal value. |
+| `==` | Separator between `t/q` and the literal value to match; positive condition operator. |
+| `!=` | Separator between `t/q` and the literal value to **not** match; negative condition operator. |
 | `^` | Separator within a composite condition between the `t` and `q` conditions. |
 | `&&` | Logical operator AND. Behaves like set intersection. |
 | <code>&#124;&#124;</code> | Logical operator OR. Behaves like set union. |
+| `-` | Logical operator NOT. Behaves like set complement (unary operator) or difference (binary operator). |
 | `()` | Grouping operator. Optionally surround any expression with parentheses. |
 
 ##### Search expr examples
@@ -1327,6 +1329,24 @@ View stories either by author `harriet hepping` or having `harriet` in the title
 
 ```shell
 [opts]: -? "t == 'author-name' ^ q == 'harriet hepping' || t == 'title' ^ q == '/.*harriet.*/'" -L txt
+```
+
+View stories published in year `2000` without tag `baily buchemi` using set difference.
+
+```shell
+[opts]: -? "(t == 'publish-date' ^ q == '/2000-.+/') - (t == 'bailey buchemi')"
+```
+
+Same result, using set intersection with complement.
+
+```shell
+[opts]: -? "(t == 'publish-date' ^ q == '/2000-.+/') && -(t == 'bailey buchemi')"
+```
+
+Same result, using set intersection with negative condition.
+
+```shell
+[opts]: -? "(t == 'publish-date' ^ q == '/2000-.+/') && (t != 'bailey buchemi')"
 ```
 
 ## Terms

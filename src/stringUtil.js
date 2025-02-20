@@ -37,4 +37,5 @@ export function compileRegexp(str) {
 export function fileString(str) {
   return sanitizeFilename(str)
   .replace(/\s+/g, '-')
+  .replace(/[\(\)]/g, '')
 }
