@@ -34,9 +34,9 @@ export class StorySummary extends LibraryDescriptor {
      */
     this.title = title
     /**
-     * @type {Date}
+     * @type {Date|undefined}
      */
-    this.publishDate = new Date(publishDate)
+    this.publishDate = publishDate !== undefined && publishDate !== null ? new Date(publishDate) : undefined
     /**
      * @type {number}
      */
@@ -70,9 +70,11 @@ export class StorySummary extends LibraryDescriptor {
     StorySummary.tTitle.connect_to(tt, TYPE_TO_TAG_CHILD)
     tt.connect_to(this)
 
-    let tpd = getDateTag(this.publishDate)
-    StorySummary.tPublishDate.connect_to(tpd, TYPE_TO_TAG_CHILD)
-    tpd.connect_to(this)
+    if (this.publishDate !== undefined) {
+      let tpd = getDateTag(this.publishDate)
+      StorySummary.tPublishDate.connect_to(tpd, TYPE_TO_TAG_CHILD)
+      tpd.connect_to(this)
+    }
   }
 
   toString() {
