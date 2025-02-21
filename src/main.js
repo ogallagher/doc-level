@@ -209,7 +209,6 @@ async function fetchStorySummaries(index, startPage, storiesMax, storiesDir) {
 }
 
 /**
- * 
  * @param {Map<string, Map<number, IndexPage>>} indexPages 
  * @returns {Promise<void>}
  */
@@ -220,9 +219,11 @@ async function showAvailableStories(indexPages) {
       // index section
       return [`[${index}]`]
         .concat(
-          [...pages.entries()].map(([page, sip]) => {
+          [...pages.entries()]
+          .sort(([pnA], [pnB]) => pnA - pnB )
+          .map(([pageNumber, indexPage]) => {
             // page file
-            return `  [${page}] ${sip.filePath}`
+            return `  [${pageNumber}] ${indexPage.filePath}`
           })
         )
         .join('\n') + '\n'
