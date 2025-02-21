@@ -360,14 +360,6 @@ function loadEnv() {
 }
 
 /**
- * Customize subscript expression parser.
- */
-export function patchSubscript() {
-  binary('!=', PREC_EQ)
-  operator('!=', (a, b) => b && (a = compile(a), b = compile(b), ctx => a(ctx) != b(ctx)))
-}
-
-/**
  * Init module logger, init filesystem, load env args, connect OpenAI api client.
  * 
  * @param {Logger} parentLogger 
@@ -388,8 +380,6 @@ export function init(parentLogger) {
       name: 'config'
     }
   )
-
-  patchSubscript()
 
   return loadEnv()
   .then((resEnv) => {

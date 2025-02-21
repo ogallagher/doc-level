@@ -2,7 +2,7 @@ import assert from 'assert'
 import pino from 'pino'
 import path from 'path'
 import { RelationalTag as rt } from 'relational_tags'
-import { TYPE_TO_TAG_CHILD, patchSubscript } from '../src/config.js'
+import { TYPE_TO_TAG_CHILD } from '../src/config.js'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
@@ -26,7 +26,6 @@ const logger = pino(
   }
 )
 
-patchSubscript()
 await libraryInit(logger)
 await siInit(logger)
 await mainInit(logger)
