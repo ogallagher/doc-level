@@ -1380,7 +1380,7 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 | `-n, --story-length-max` | Max character length of story text to include when generating its profile. | `-s` |
 | `-P, --force-profile` | Even if a profile for the selected story exists, generate a new one to replace it. | `-s` |
 | `-0, --skip-profile` | Even if a story is selected, do not generate a profile for it. | `-s` |
-| `-a, --autopilot` | Continue to cycle through stories and pages without pausing for input until `-m` is reached. Combine with `-i`, `-p`, `-s` opts to specify from which story to begin. | `-s` |
+| `-a, --autopilot` | Continue to cycle through stories and pages without pausing for input until `-m` is reached. Combine with `-i`, `-p`, `-s` opts to specify from which story to begin. | `-s` or `-H` |
 | `-L, --show-library` | Show library (fetched stories, profiles, indexes, etc). Combine with other opts to only show a subset of items.<ul><li>`tag` = Print flat list of all available tags for searching. This is a good way to get an idea of how the stories are organized. Filters like `-t` and `-q` are not applicable here.</li><li>`txt` = Print flat list of books to a plain text file. </li><li>`md` = Render as a markdown file.</li><li>`html` [pending] = Render as a local webpage.</li></ul> | |
 | `-t, --tag` | Tag name for searching library items. If combined with `-q`, defines the parent tag under which search is performed. | `-L` |
 | `-q, --query` | Tag name pattern as a query string for searching library items. Surround with slashes like `/\w+e/` to search using a regular expression. Note that currently the regexp must match the whole tag name, not a substring. | `-L` |
