@@ -1384,7 +1384,7 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 | `-q, --query` | Tag name pattern as a query string for searching library items. Surround with slashes like `/\w+e/` to search using a regular expression. Note that currently the regexp must match the whole tag name, not a substring. | `-L` |
 | `-?, --search-expr` | Library search expression with support for logical operators. Syntax is described in more detail below. Replaces `-t` and `-q` for more advanced searches. | `-L` |
 | `->, --sort` | Sort direction of search results. Ex. `-t years-of-education -> asc` will sort easiest texts first, and `-> desc` hardest first. | `-L` |
-| `-H, --show-history` | Load and show `<n>` (value optional) latest entries from library search history. [pending] Combine with `--autopilot` to profile the results from entry number `<n>`, higher is newer. |
+| `-H, --show-history` | Load and show `<n>` (value optional) latest entries from library search history. Combine with `--autopilot` to profile the results from entry number `<n>`, higher is newer. |
 | `-d, --stories-dir` | Local filesystem directory where story lists and texts are saved. | |
 | `-D, --profiles-dir` | Local directory where story profiles are saved. | |
 | `-e, --renders-dir` | Local directory where library renderings/exports are saved. | |

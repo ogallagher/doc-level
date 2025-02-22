@@ -219,11 +219,11 @@ export const argParser = (
   })
   .option('show-history', {
     alias: 'H',
-    // type is string to prepare for variable support like @first @last
+    // type is string for variable support like @first @last
     type: 'string',
     description: (
       'Show <n> latest entries from library search history. '
-      + '[pending] Combine with --autopilot to profile the results from entry <n>, higher is newer.'
+      + 'Combine with --autopilot to profile the results from entry <n>, higher is newer.'
     )
   })
   .example('-L txt -t years-of-education -> asc', 'Show profiled library texts with easiest first.')
