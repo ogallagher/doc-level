@@ -666,6 +666,10 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
 
   // show history
   /**
+   * Note currently only usage of historyBooks is as input to autopilot, which only needs BookReference
+   * instances. If that continues to be the case, I could improve performance by skipping the
+   * calls to reader.loadLibraryBook.
+   * 
    * @type {lib.LibraryBook[]|undefined}
    */
   let historyBooks = undefined
@@ -907,7 +911,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   }
 
   // use history books as input instead of single story
-  if (historyBooks !== undefined && storySummary !== undefined) {
+  if (historyBooks !== undefined) {
     if (args.autopilot) {
       console.log('launch autopilot for %s history books', historyBooks.length)
       await autopilot(args, undefined, historyBooks)
