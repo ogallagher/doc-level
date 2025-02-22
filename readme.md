@@ -1181,6 +1181,8 @@ Open this profile in an editor.
 
 Once you're comfortable with results from profiling stories one at a time, you can use `--autopilot` to queue a list of stories to be profiled without user intervention.
 
+The `-m` limiter both when defining the start story with `-s`, and when passing in results from search history with `-H`.
+
 ```shell
 # in internet, starting from first story on page 2, fetch and profile 20 stories using autopilot
 [opts]: -i internet -p 2 -s @first -m 20 -a

@@ -94,6 +94,10 @@ export async function autopilot(args, storyArrayIndex, books=[]) {
     ).fetchedPagedStories
     console.log(`fetched pages of ${args.fetchStoriesMax} story summaries`)
 
+    const firstPageNumber = Math.min(...pagedStories.keys())
+    // skip stories before first requested
+    pagedStories.set(firstPageNumber, pagedStories.get(firstPageNumber).slice(storyArrayIndex))
+
     for (let [pageNumber, pageStories] of pagedStories.entries()) {
       // determine count of new stories
       if (books.length + pageStories.length > args.fetchStoriesMax) {
@@ -112,6 +116,10 @@ export async function autopilot(args, storyArrayIndex, books=[]) {
         break
       }
     }
+  }
+  else {
+    // apply limit to books list
+    books = books.slice(0, args.fetchStoriesMax)
   }
 
   for (let bookRef of books) {
