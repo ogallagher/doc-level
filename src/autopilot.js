@@ -58,9 +58,9 @@ function getConstantArgs(args) {
  * 
  * @param {Args} args
  * @param {number|undefined} storyArrayIndex
- * @param {BookReference[]|undefined} books
+ * @param {BookReference[]} books
  */
-export async function autopilot(args, storyArrayIndex, books) {
+export async function autopilot(args, storyArrayIndex, books=[]) {
   if (storyArrayIndex !== undefined) {
     logger.info('begin autopilot at index=%s page=s story=@%s', args.index, args.page, storyArrayIndex)
   }
@@ -77,36 +77,33 @@ export async function autopilot(args, storyArrayIndex, books) {
   const storyProcessors = []
 
   // derive list of book references from start story if list not provided
-  if (books === undefined) {
+  if (storyArrayIndex !== undefined) {
     // fetch pages of story summaries
-    await main(
-      [
-        '--fetch-stories-index', args.index,
-        '--fetch-stories-max', args.fetchStoriesMax,
-        '--page', args.page
-      ].concat(constArgs),
-      undefined, undefined, false
-    )
+    /**
+     * @type {Map<number, StorySummary[]>}
+     */
+    const pagedStories = (
+      await main(
+        [
+          '--fetch-stories-index', args.index,
+          '--fetch-stories-max', args.fetchStoriesMax,
+          '--page', args.page
+        ].concat(constArgs),
+        undefined, undefined, false
+      )
+    ).fetchedPagedStories
     console.log(`fetched pages of ${args.fetchStoriesMax} story summaries`)
 
-    /**
-     * @type {Map<number, IndexPage>}
-     */
-    const indexPages = (await listStoryIndexPages(args.storiesDir, args.index)).get(args.index)
-
-    books = []
-    for (let [_pn, ip] of indexPages.entries()) {
-      // determine list of stories to process for each page
-      let pageStories = await loadStories(ip.filePath)
+    for (let [pageNumber, pageStories] of pagedStories.entries()) {
       // determine count of new stories
       if (books.length + pageStories.length > args.fetchStoriesMax) {
         pageStories = pageStories.slice(0, args.fetchStoriesMax - books.length)
       }
-      logger.info('process %s stories from page %o', pageStories.length, ip)
+      logger.info('process %s stories from page %o', pageStories.length, pageNumber)
       books = books.concat(pageStories.map((story) => {
         return {
-          indexName: ip.indexName,
-          pageNumber: ip.pageNumber,
+          indexName: args.index,
+          pageNumber: pageNumber,
           storyId: story.id
         }
       }))
