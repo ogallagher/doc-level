@@ -58,7 +58,7 @@ function getConstantArgs(args) {
  * 
  * @param {Args} args
  * @param {number|undefined} storyArrayIndex
- * @param {LibraryBook[]|undefined} books
+ * @param {BookReference[]|undefined} books
  */
 export async function autopilot(args, storyArrayIndex, books) {
   if (storyArrayIndex !== undefined) {
@@ -75,11 +75,8 @@ export async function autopilot(args, storyArrayIndex, books) {
    * @type {Promise[]}
    */
   const storyProcessors = []
-  /**
-   * @type {BookReference[]}
-   */
-  let bookRefs
 
+  // derive list of book references from start story if list not provided
   if (books === undefined) {
     // fetch pages of story summaries
     await main(
@@ -97,16 +94,16 @@ export async function autopilot(args, storyArrayIndex, books) {
      */
     const indexPages = (await listStoryIndexPages(args.storiesDir, args.index)).get(args.index)
 
-    bookRefs = []
+    books = []
     for (let [_pn, ip] of indexPages.entries()) {
       // determine list of stories to process for each page
       let pageStories = await loadStories(ip.filePath)
       // determine count of new stories
-      if (bookRefs.length + pageStories.length > args.fetchStoriesMax) {
-        pageStories = pageStories.slice(0, args.fetchStoriesMax - bookRefs.length)
+      if (books.length + pageStories.length > args.fetchStoriesMax) {
+        pageStories = pageStories.slice(0, args.fetchStoriesMax - books.length)
       }
       logger.info('process %s stories from page %o', pageStories.length, ip)
-      bookRefs = bookRefs.concat(pageStories.map((story) => {
+      books = books.concat(pageStories.map((story) => {
         return {
           indexName: ip.indexName,
           pageNumber: ip.pageNumber,
@@ -114,17 +111,13 @@ export async function autopilot(args, storyArrayIndex, books) {
         }
       }))
 
-      if (bookRefs.length >= args.fetchStoriesMax) {
+      if (books.length >= args.fetchStoriesMax) {
         break
       }
     }
   }
-  else {
-    // fetch stories from provided books list
-    bookRefs = books.map(LibrarySearchEntry.getBookRef)
-  }
 
-  for (let bookRef of bookRefs) {
+  for (let bookRef of books) {
     storyProcessors.push(main(
       [
         '--index', bookRef.indexName, 
@@ -135,7 +128,7 @@ export async function autopilot(args, storyArrayIndex, books) {
     ))
   }
 
-  console.log(`queued ${bookRefs.length} story processors across ${storyProcessors.length} page processors`)
+  console.log(`queued ${storyProcessors.length} story processors`)
 
   await Promise.all(storyProcessors)
   console.log('end autopilot')

@@ -666,11 +666,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
 
   // show history
   /**
-   * Note currently only usage of historyBooks is as input to autopilot, which only needs BookReference
-   * instances. If that continues to be the case, I could improve performance by skipping the
-   * calls to reader.loadLibraryBook.
-   * 
-   * @type {lib.LibraryBook[]|undefined}
+   * @type {BookReference[]|undefined}
    */
   let historyBooks = undefined
   if (args.showHistory !== undefined) {
@@ -706,23 +702,10 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     let searches = await showLibarySearches(lastSearchNumber, searchCount, args.historyDir)
 
     if (historyBooks !== undefined) {
-      // load books from search history
-      /**
-       * @type {Promise<undefined>[]}
-       */
-      let p = []
+      // load book references from search history
       for (let search of searches.values()) {
-        for (let bookRef of search.resultBookRefs) {
-          p.push(
-            reader.loadLibraryBook(bookRef, args.storiesDir)
-            .then((book) => {
-              historyBooks.push(book)
-            })
-          )
-        }
+        historyBooks.push(...search.resultBookRefs)
       }
-
-      await Promise.all(p)
     }
   }
 
