@@ -9,12 +9,14 @@ import { getStoriesIndex } from './storiesIndex/index.js'
 import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { LOCAL_INDEX_NAME } from './storiesIndex/LocalStoriesIndex.js'
 import { StorySummary } from './storySummary.js'
-import { fileString } from './stringUtil.js'
+import { dateToString, fileString } from './stringUtil.js'
 import { IndexPage } from './indexPage.js'
 import { flushCliLogStream } from './pinoCliLogTransport.js'
 import { autopilot } from './autopilot.js'
+import { LibrarySearchEntry } from './librarySearchEntry.js'
 /**
  * @typedef {import('pino').Logger} Logger
+ * @typedef {import('./librarySearchEntry.js').BookReference} BookReference
  */
 
 /**
@@ -180,6 +182,27 @@ export async function resolveStoryVar(storyOpt, storyPrev, pagePath) {
 }
 
 /**
+ * 
+ * @param {string} historyOpt 
+ */
+export async function resolveHistoryVar(historyOpt) {
+  if (historyOpt.startsWith(config.OPT_VAR_PREFIX)) {
+    const historyVar = historyOpt.substring(config.OPT_VAR_PREFIX.length)
+
+    if (historyVar === config.OPT_VAR_LAST) {
+      return Number.POSITIVE_INFINITY
+    }
+    else {
+      throw new Error(`invalid history variable ${historyOpt}`)
+    }
+  }
+  else {
+    // value of history option is not a variable
+    return parseInt(historyOpt)
+  }
+}
+
+/**
  * @param {StoriesIndex} index 
  * @param {string} startPage
  * @param {number} storiesMax 
@@ -218,19 +241,45 @@ async function showAvailableStories(indexPages) {
     [...indexPages.entries()].map(([index, pages]) => {
       // index section
       return [`[${index}]`]
-        .concat(
-          [...pages.entries()]
-          .sort(([pnA], [pnB]) => pnA - pnB )
-          .map(([pageNumber, indexPage]) => {
-            // page file
-            return `  [${pageNumber}] ${indexPage.filePath}`
-          })
-        )
-        .join('\n') + '\n'
+      .concat(
+        [...pages.entries()]
+        .sort(([pnA], [pnB]) => pnA - pnB )
+        .map(([pageNumber, indexPage]) => {
+          // page file
+          return `  [${pageNumber}] ${indexPage.filePath}`
+        })
+      )
+      .join('\n') + '\n'
     })
-      .join('\n')
+    .join('\n')
   )
   console.log(browseStoriesPrompt)
+}
+
+/**
+ * 
+ * @param {string|undefined} lastNumberVar 
+ * @param {number|undefined} count 
+ * @param {string} historyDir 
+ */
+async function showLibarySearches(lastNumberVar, count, historyDir) {
+  const lastNumber = await resolveHistoryVar(lastNumberVar)
+  console.log(`Library search history: show latest ${count} until ${lastNumber}`)
+  let searches = await reader.listLibrarySearchHistory(historyDir, lastNumber, count)
+
+  new Array(...searches.entries())
+  // sort time (number) descending
+  .sort(([nA], [nB]) => nB - nA)
+  // print entries to console
+  .forEach(([number, search]) => {
+    console.log(
+      `[${number}] @${search.searchDate.toISOString()} x${search.resultBookRefs.length}\n`
+      + `\t((${search.input}))\n`
+      + `\t[${search.renderFilePath}]`
+    )
+  })
+  
+  return searches
 }
 
 /**
@@ -580,7 +629,8 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   // update filesystem 
   await Promise.all([
     writer.initDir(args.storiesDir),
-    writer.initDir(args.profilesDir)
+    writer.initDir(args.profilesDir),
+    writer.initDir(path.join(args.historyDir, config.SEARCHES_DIR)),
   ])
 
   // fetch new story summaries
@@ -607,12 +657,72 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     args.story === undefined
     && args.localStoryFile === undefined
     && args.showLibrary === undefined
+    && args.showHistory === undefined
     && !args.help
   ) {
     indexPages = await reader.listStoryIndexPages(args.storiesDir)
     await showAvailableStories(indexPages)
   }
 
+  // show history
+  /**
+   * @type {lib.LibraryBook[]|undefined}
+   */
+  let historyBooks = undefined
+  if (args.showHistory !== undefined) {
+    /**
+     * @type {string}
+     */
+    let lastSearchNumber
+    /**
+     * @type {number}
+     */
+    let searchCount
+    
+    if (args.autopilot) {
+      if (args.showHistory === '') {
+        // default search number
+        args.showHistory = `${config.OPT_VAR_PREFIX}${config.OPT_VAR_LAST}`
+      }
+
+      lastSearchNumber = args.showHistory
+      searchCount = 1
+      historyBooks = []
+    }
+    else {
+      if (args.showHistory === '') {
+        // default search count
+        args.showHistory = 10
+      }
+
+      lastSearchNumber = `${config.OPT_VAR_PREFIX}${config.OPT_VAR_LAST}`
+      searchCount = args.showHistory
+    }
+
+    let searches = await showLibarySearches(lastSearchNumber, searchCount, args.historyDir)
+
+    if (historyBooks !== undefined) {
+      // load books from search history
+      /**
+       * @type {Promise<undefined>[]}
+       */
+      let p = []
+      for (let search of searches.values()) {
+        for (let bookRef of search.resultBookRefs) {
+          p.push(
+            reader.loadLibraryBook(bookRef, args.storiesDir)
+            .then((book) => {
+              historyBooks.push(book)
+            })
+          )
+        }
+      }
+
+      await Promise.all(p)
+    }
+  }
+
+  // load and search library
   if (args.showLibrary !== undefined) {
     logger.info('show library in format=%s', args.showLibrary)
 
@@ -653,8 +763,46 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     const renderFile = await writer.openFile(renderPath)
 
     try {
-      for (let chunk of lib.exportLibrary(library, args.showLibrary, args.tag, args.query, args.searchExpr, args.sort)) {
-        await writer.writeText(chunk, renderFile)
+      let exportLibraryGen = lib.exportLibrary(library, args.showLibrary, args.tag, args.query, args.searchExpr, args.sort)
+      /**
+       * @type {string|BookReference[]|undefined}
+       */
+      let value
+      
+      for (
+        let next = exportLibraryGen.next(); 
+        (value = next.value) && !next.done; 
+        next = exportLibraryGen.next()
+      ) {
+        await writer.writeText(value, renderFile)
+      }
+
+      if (value !== undefined) {
+        // open new search history entry file
+        const lastSearchEntry = (
+          await reader.listLibrarySearchHistoryPaths(args.historyDir, Number.POSITIVE_INFINITY, 1)
+        )[0]
+        const searchEntry = new LibrarySearchEntry(
+          new Date(), 
+          lastSearchEntry !== undefined ? lastSearchEntry[0] + 1 : 0,
+          [].concat(
+            (args.tag !== undefined ? ['-t', `"${args.tag}"`] : []),
+            (args.query !== undefined ? ['-q', `"${args.query}"`] : []),
+            (args.searchExpr !== undefined ? ['-?', `"${args.searchExpr}"`]: []),
+            (args.sort !== undefined ? ['->', args.sort] : []),
+            ['-L', args.showLibrary]
+          ).join(' '),
+          renderPath,
+          value,
+          args.historyDir
+        )
+
+        logger.info('write library search entry to %s', searchEntry.filePath)
+        await writer.writeText(JSON.stringify(searchEntry, searchEntry.getSerializable, 2), searchEntry.filePath)
+        console.log(
+          `added entry with ${searchEntry.resultBookRefs.length} book references `
+          + `to library search history at ${searchEntry.filePath}`
+        )
       }
     }
     catch (err) {
@@ -756,6 +904,17 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   )
   if (storySummary !== undefined) {
     logger.debug('fetched storySummary=%o', storySummary)
+  }
+
+  // use history books as input instead of single story
+  if (historyBooks !== undefined && storySummary !== undefined) {
+    if (args.autopilot) {
+      console.log('launch autopilot for %s history books', historyBooks.length)
+      await autopilot(args, undefined, historyBooks)
+    }
+    else {
+      logger.error('no operation selected for %s loaded history books', historyBooks.length)
+    }
   }
 
   // add unprofiled story to library if exists

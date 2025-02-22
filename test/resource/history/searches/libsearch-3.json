@@ -1,0 +1,8 @@
+{
+  "searchDate": "2025-03-20",
+  "searchNumber": 3,
+  "input": "-t author-name -q 'gerardo gambino'",
+  "filePath": "test/resource/history/searches/libsearch-3.json",
+  "renderFilePath": "test/resource/renders/library_search-3.txt",
+  "resultBookRefs": []
+}

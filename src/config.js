@@ -9,8 +9,6 @@ import path from 'path'
 import { hideBin } from 'yargs/helpers'
 import { compileRegexp } from './stringUtil.js'
 import { RelationalTagConnection } from 'relational_tags'
-import { binary, operator, compile } from 'subscript'
-import { PREC_EQ } from 'subscript/const'
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {import('./storiesIndex/storiesIndex.js').StoriesIndex} StoriesIndex
@@ -19,6 +17,8 @@ import { PREC_EQ } from 'subscript/const'
 const ENV_KEY_OPENAI_API_KEY = 'OPENAI_API_KEY' 
 const ENV_KEY_READING_DIFFICULTY_WORDS_MAX = 'READING_DIFFICULTY_WORDS_MAX'
 const ENV_KEY_READING_DIFFICULTY_PHRASES_MAX = 'READING_DIFFICULTY_PHRASES_MAX'
+
+export const SEARCHES_DIR = 'searches'
 
 /**
  * tag-tag connection type for parent to child.
@@ -34,6 +34,7 @@ export const TYPE_TO_TAG_PARENT = RelationalTagConnection.inverse_type(TYPE_TO_T
 export const OPT_VAR_PREFIX = '@'
 export const OPT_VAR_FIRST = 'first'
 export const OPT_VAR_NEXT = 'next'
+export const OPT_VAR_LAST = 'last'
 /**
  * Operator used for logical AND (set intersect) in a library search expression.
  */
@@ -216,7 +217,25 @@ export const argParser = (
     choices: ['asc', 'desc'],
     description: 'Sort direction of search results. Default is not sorted.'
   })
+  .option('show-history', {
+    alias: 'H',
+    // type is string to prepare for variable support like @first @last
+    type: 'string',
+    description: (
+      'Show <n> latest entries from library search history. '
+      + '[pending] Combine with --autopilot to profile the results from entry <n>, higher is newer.'
+    )
+  })
   .example('-L txt -t years-of-education -> asc', 'Show profiled library texts with easiest first.')
+  .option('reload', {
+    alias: 'r',
+    type: 'boolean',
+    description: (
+      'Whether to reload library objects from the filesystem. '
+      + 'Not usually necessary unless files were changed manually.'
+    ),
+    default: false
+  })
   .option('stories-dir', {
     alias: 'd',
     type: 'string',
@@ -235,14 +254,10 @@ export const argParser = (
     description: 'Local directory where library renderings/exports are saved.',
     default: path.join('data', 'renders')
   })
-  .option('reload', {
-    alias: 'r',
-    type: 'boolean',
-    description: (
-      'Whether to reload library objects from the filesystem. '
-      + 'Not usually necessary unless files were changed manually.'
-    ),
-    default: false
+  .option('history-dir', {
+    type: 'string',
+    description: 'Local directory where activity history (ex. library search history) is saved.',
+    default: path.join('data', 'history')
   })
   .option('log-level', {
     alias: 'l',
@@ -279,7 +294,9 @@ argParser.wrap(argParser.terminalWidth())
  *  forceProfile: boolean,
  *  autopilot: boolean,
  *  showLibrary: string | undefined,
+ *  showHistory: string | undefined,
  *  rendersDir: string,
+ *  historyDir: string,
  *  reload: boolean,
  *  tag: string | undefined,
  *  query: string | RegExp | undefined,
@@ -300,6 +317,9 @@ export function loadArgs(argSrc=hideBin(process.argv)) {
   return new Promise(function(res) {
     logger.debug('load runtime args')
 
+    /**
+     * @type {Args}
+     */
     const argv = argParser.parse(argSrc)
 
     // query

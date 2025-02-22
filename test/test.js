@@ -6,7 +6,7 @@ import { TYPE_TO_TAG_CHILD } from '../src/config.js'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
 import { formatString } from '../src/stringUtil.js'
-import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml, reduceStory, loadProfile, getProfilePath } from '../src/reader.js'
+import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml, reduceStory, loadProfile, getProfilePath, listLibrarySearchHistory } from '../src/reader.js'
 import { init as siInit, getStoriesIndex } from '../src/storiesIndex/index.js'
 import { StoriesIndex } from '../src/storiesIndex/storiesIndex.js'
 import { MunjangStoriesIndex } from '../src/storiesIndex/MunjangStoriesIndex.js' 
@@ -180,6 +180,16 @@ describe('reader', function() {
         logger.info('sample-len=%s population-len=%s sample=%o', rLen, pgLenTotal, r)
         assert.strictEqual(r.length, pgs.length)  
       })
+    })
+  })
+
+  describe('#listLibrarySearchHistory', () => {
+    it('works for valid libsearch files and skips invalid paths', async () => {
+      let searches = await listLibrarySearchHistory('test/resource/history', 3, 3)
+      assert.ok(searches.has(0))
+      logger.info('libsearch-0=%s', searches.get(0))
+      assert.ok(searches.has(3))
+      assert.strictEqual(searches.size, 2)
     })
   })
 })

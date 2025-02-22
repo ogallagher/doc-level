@@ -39,3 +39,7 @@ export function fileString(str) {
   .replace(/\s+/g, '-')
   .replace(/[\(\)]/g, '')
 }
+
+export function dateToString(date) {
+  return date.toISOString().substring(0, 10)
+}

@@ -1,0 +1,8 @@
+{
+  "searchDate": "2025-04-20",
+  "searchNumber": 4,
+  "input": "-t author-name -q 'harriet hamster'",
+  "filePath": "test/resource/history/searches/libsearch-4.json",
+  "renderFilePath": "test/resource/renders/library_search-4.txt",
+  "resultBookRefs": []
+}

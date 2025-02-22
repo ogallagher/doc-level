@@ -1,0 +1,8 @@
+{
+  "searchDate": "2025-02-20",
+  "searchNumber": 0,
+  "input": "-t author-name -q 'earl echidna'",
+  "filePath": "test/resource/history/searches/libsearch-0.json",
+  "renderFilePath": "test/resource/renders/library_search-0.txt",
+  "resultBookRefs": []
+}

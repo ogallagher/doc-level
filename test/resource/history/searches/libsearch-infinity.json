@@ -1,0 +1,7 @@
+{
+  "searchDate": "2025-02-20",
+  "searchNumber": "infinity",
+  "input": "-t author-name -q 'fern fabian'",
+  "filePath": "test/resource/history/searches/libsearch-infinity.json",
+  "renderFilePath": "test/resource/renders/library_search-infinity.txt"
+}

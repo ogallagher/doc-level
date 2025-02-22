@@ -9,10 +9,12 @@ import { IndexPage } from './indexPage.js'
 import { loadText, loadProfile, getProfilePath } from './reader.js'
 import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT, SEARCH_OP_NEQ, SEARCH_OP_NOT } from './config.js'
 import { compileRegexp } from './stringUtil.js'
+import { LibrarySearchEntry } from './librarySearchEntry.js'
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {Array<string|SearchExpression>} SearchExpression Multi term expression.
  * @typedef {import('relational_tags').RelationalTagConnection} RelationalTagConnection
+ * @typedef {import('./librarySearchEntry.js').BookReference} BookReference
  */
 
 /**
@@ -52,6 +54,7 @@ function initTags() {
   LibraryBook.t = RelationalTag.new('library-book')
   IndexPage.t = RelationalTag.new('index-page')
   StoriesIndex.t = RelationalTag.new('stories-index')
+  LibrarySearchEntry.t = RelationalTag.new('library-search-entry')
   StorySummary.t = RelationalTag.new('story')
   TextProfile.t = RelationalTag.new('text-profile')
   Ideology.t = RelationalTag.new('ideology')
@@ -63,6 +66,7 @@ function initTags() {
   LibraryBook.initTags()
   IndexPage.initTags()
   StoriesIndex.initTags()
+  LibrarySearchEntry.initTags()
   StorySummary.initTags()
   TextProfile.initTags()
   Ideology.initTags()
@@ -232,7 +236,8 @@ export function getTagLineageName(tag, delim='.', truncPrefix='...') {
 }
 
 /**
- * Export/render the given `Library` instance as a content string in the requested format.
+ * Export/render the given `Library` instance as a content string in the requested format, as well as
+ * a list of {@linkcode LibrarySearchEntry} instances as a side-effect file.
  * 
  * @param {Library} library 
  * @param {string} format
@@ -241,7 +246,8 @@ export function getTagLineageName(tag, delim='.', truncPrefix='...') {
  * @param {string|undefined} searchExpr Tag search expression.
  * @param {string|undefined} sort Sort direction. 
  * 
- * @returns {Generator<string>}
+ * @returns {Generator<string, BookReference[]>} Yields strings to be written to the render
+ * file. On completion, returns a list of library book references, if applicable.
  */
 export function *exportLibrary(library, format, startTagName, query, searchExpr, sort) {
   /**
@@ -286,6 +292,10 @@ export function *exportLibrary(library, format, startTagName, query, searchExpr,
      * @type {RelationalTagConnection[]}
      */
     let bookSearchPath
+    /**
+     * @type {BookReference[]}
+     */
+    let bookRefs = []
 
     if (format === 'txt') {
       logger.info('render library as a list books')
@@ -296,6 +306,8 @@ export function *exportLibrary(library, format, startTagName, query, searchExpr,
         !next.done && ([book, bookSearchPath] = next.value);
         next = bookGen.next()
       ) {
+        bookRefs.push(LibrarySearchEntry.getBookRef(book))
+
         yield '- \n'
         for (let chunk of book.describe('  ', bookSearchPath)) {
           yield chunk
@@ -341,6 +353,8 @@ export function *exportLibrary(library, format, startTagName, query, searchExpr,
         !next.done && ([book, bookSearchPath] = next.value);
         next = bookGen.next()
       ) {
+        bookRefs.push(LibrarySearchEntry.getBookRef(book))
+
         /**
          * @type {string}
          */
@@ -458,6 +472,8 @@ export function *exportLibrary(library, format, startTagName, query, searchExpr,
     else {
       throw new Error(`unsupported library export format=${format}`)
     }
+
+    return bookRefs
   }
 }
 

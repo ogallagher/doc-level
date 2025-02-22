@@ -1384,6 +1384,7 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 | `-q, --query` | Tag name pattern as a query string for searching library items. Surround with slashes like `/\w+e/` to search using a regular expression. Note that currently the regexp must match the whole tag name, not a substring. | `-L` |
 | `-?, --search-expr` | Library search expression with support for logical operators. Syntax is described in more detail below. Replaces `-t` and `-q` for more advanced searches. | `-L` |
 | `->, --sort` | Sort direction of search results. Ex. `-t years-of-education -> asc` will sort easiest texts first, and `-> desc` hardest first. | `-L` |
+| `-H, --show-history` | Load and show `<n>` (value optional) latest entries from library search history. [pending] Combine with `--autopilot` to profile the results from entry number `<n>`, higher is newer. |
 | `-d, --stories-dir` | Local filesystem directory where story lists and texts are saved. | |
 | `-D, --profiles-dir` | Local directory where story profiles are saved. | |
 | `-e, --renders-dir` | Local directory where library renderings/exports are saved. | |
@@ -1393,6 +1394,9 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 For `--story`, instead of providing a story id, you can also use variable expressions `@first` for the first story in the page, `@next` for the next story in the page, or `@<array-index>` for the story at a given index within the page stories array. `@first` and `@0` are equivalent.
 
 Similarly for `--page`, instead of providing a page number, you can also use variable expressions `@first` for the first page in the stories index, or `@next` for the next page. If used with `-f`, then `@next` is **the next page after the last** one already in the local filesystem, instead of the next after the most recently used page.
+
+For `--show-history`, the opt value can be a number or, if used as input to `--autopilot`, variable
+`@last` to refer to newest search entry.
 
 `-L` is used to explore the library.
 Combine with `-t` (tag name), `-q`, (tag name pattern), or both (composite of ancestor tag and descendant tag pattern) to define the filter condition. 

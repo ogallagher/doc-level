@@ -16,12 +16,15 @@ import {
   TOPICS_MAX as _topicsMax,
   TOPIC_EXAMPLES_MAX as _topicExamplesMax,
   IDEOLOGIES_MAX as _ideologiesMax,
-  IDEOLOGY_EXAMPLES_MAX as _ideologyExamplesMax
+  IDEOLOGY_EXAMPLES_MAX as _ideologyExamplesMax,
+  SEARCHES_DIR
 } from './config.js'
 import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { downloadWebpage, fileExists, initDir, writeText } from './writer.js'
 import { IndexPage } from './indexPage.js'
+import { LibrarySearchEntry } from './librarySearchEntry.js'
+import { LibraryBook } from './library.js'
 
 /**
  * @typedef {import('pino').Logger} Logger
@@ -35,6 +38,7 @@ import { IndexPage } from './indexPage.js'
  * @typedef {import('./messageSchema.js').ExtractStoriesResponse} ExtractStoriesResponse
  * @typedef {import('./messageSchema.js').TopicsResponse} TopicsResponse
  * @typedef {import('./messageSchema.js').IdeologiesResponse} IdeologiesResponse
+ * @typedef {import('./librarySearchEntry.js').BookReference} BookReference
  */
 
 let PROMPT_DIR = path.join(import.meta.dirname, 'resource/prompt')
@@ -710,6 +714,7 @@ export function listFiles(dir, pattern) {
  */
 export function loadStories(pagePath) {
   return loadText(pagePath).then(JSON.parse)
+  .then((stories) => stories.map((s) => StorySummary.fromData(s)))
 }
 
 /**
@@ -730,7 +735,10 @@ export async function loadStory(pagePath, storyId) {
     }
   })
 
-  if (stories.length === 1) {
+  if (stories.length > 0) {
+    if (stories.length > 1) {
+      logger.warn('page %s has %s stories with id=%s; selecting arbitrary one', pagePath, stories.length, storyId)
+    }
     return {
       story: stories[0],
       storyArrayIndex
@@ -785,6 +793,32 @@ export function loadProfile(profilePath) {
 }
 
 /**
+ * Load {@linkcode LibraryBook} from the given book reference.
+ * 
+ * @param {BookReference} bookRef 
+ * @param {string} storiesDir
+ * 
+ * @returns {LibraryBook}
+ */
+export async function loadLibraryBook(bookRef, storiesDir) {
+  // get page
+  let page = new IndexPage(bookRef.indexName, bookRef.pageNumber, undefined, storiesDir)
+  // load story from page file
+  let {story, storyArrayIndex} = await loadStory(page.filePath, bookRef.storyId)
+  logger.info('loaded story %s from %s[%s]', story, page, storyArrayIndex)
+
+  /**
+   * @type {TextProfile|undefined}
+   */
+  let profile
+  if (bookRef.profilePath !== undefined) {
+    profile = await loadProfile(bookRef.profilePath)
+  }
+
+  return new LibraryBook(undefined, story, page, profile)
+}
+
+/**
  * @param {string} storiesDir
  * @param {string|undefined} indexName
  * 
@@ -806,7 +840,7 @@ export async function listStoryIndexPages(storiesDir, indexName) {
       /index.json$/
     )
     .then((indexPaths) => {
-      logger.debug('parsing %s story index page paths', indexPages.size)
+      logger.debug('parsing %s story index page paths', indexPaths.length)
       const pagePathRegExp = new RegExp(`${indexName === undefined ? '([^\/]+)/' : ''}page-(\\d+)`)
 
       indexPaths.forEach(
@@ -841,6 +875,66 @@ export async function listStoryIndexPages(storiesDir, indexName) {
   )
 
   return indexPages
+}
+
+/**
+ * @param {string} historyDir 
+ * @param {number} lastNumber
+ * @param {number} count 
+ * 
+ * @returns {Promise<[number, string][]>} Numbered search entry file paths ordered number descending
+ * (newest first).
+ */
+export async function listLibrarySearchHistoryPaths(historyDir, lastNumber, count) {
+  return listFiles(path.join(historyDir, SEARCHES_DIR), LibrarySearchEntry.fileRegExp)
+  // select requested search entry paths
+  .then((searchPaths) => {
+    logger.debug('parse %s available library search entry paths', searchPaths.length)
+    let resultCount = 0
+
+    return searchPaths.map((searchPath) => [LibrarySearchEntry.parseSearchNumber(searchPath), searchPath])
+    // sort search number descending
+    .sort(([nA], [nB]) => nB - nA)
+    // limit by lastNumber and count
+    .filter(([number]) => {
+      if (number <= lastNumber && resultCount < count) {
+        resultCount++
+        return true
+      }
+      else {
+        return false
+      }
+    })
+  })
+}
+
+/**
+ * @param {string} historyDir 
+ * @param {number} lastNumber
+ * @param {number} count 
+ */
+export async function listLibrarySearchHistory(historyDir, lastNumber, count=1) {
+  /**
+   * @type {Map<number, LibrarySearchEntry}
+   */
+  const searches = new Map()
+  
+  const numberedSearchPaths = await listLibrarySearchHistoryPaths(historyDir, lastNumber, count)
+
+  logger.debug('load %s selected library search entries', numberedSearchPaths.length)
+  let p = []
+  for (let [searchNumber, searchPath] of numberedSearchPaths) {
+    p.push(
+      loadText(searchPath)
+      .then(JSON.parse)
+      .then((searchEntry) => {
+        searches.set(searchNumber, LibrarySearchEntry.fromData(searchEntry, historyDir))
+      })
+    )
+  }
+
+  await Promise.all(p)
+  return searches
 }
 
 /**
