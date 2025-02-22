@@ -89,8 +89,9 @@ export const TOPICS_MAX = 6
 export const TOPIC_EXAMPLES_MAX = 10
 export const IDEOLOGIES_MAX = 6
 export const IDEOLOGY_EXAMPLES_MAX = 10
-export const SEARCH_TAGS_MAX = 500
-export const SEARCH_TAG_BOOKS_MAX = 1000
+// Effectively disabled library search intermediate result set limits, to be replaced by configurable limits on final result.
+export const SEARCH_TAGS_MAX = Number.POSITIVE_INFINITY
+export const SEARCH_TAG_BOOKS_MAX = Number.POSITIVE_INFINITY
 
 /**
  * @type {Logger}

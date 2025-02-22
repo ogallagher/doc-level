@@ -917,11 +917,13 @@ export class Library extends LibraryDescriptor {
 
         if (!excludeWithoutInclude) {
           // remove descriptors connected to excluded tags
-          for (let descriptor of [...descriptors.keys()]) {
-            for (let excludeTag of excludeTags.values()) {
-              if (RelationalTag.search_tags_of_entity(descriptor, excludeTag.name, TYPE_TO_TAG_PARENT, false).length > 0) {
-                logger.debug('exclude descriptor %s connected to %s', descriptor, excludeTag)
-                descriptors.delete(descriptor)
+          if (excludeTags.size > 0) {
+            for (let descriptor of [...descriptors.keys()]) {
+              for (let excludeTag of excludeTags.values()) {
+                if (RelationalTag.search_tags_of_entity(descriptor, excludeTag.name, TYPE_TO_TAG_PARENT, false).length > 0) {
+                  logger.debug('exclude descriptor %s connected to %s', descriptor, excludeTag)
+                  descriptors.delete(descriptor)
+                }
               }
             }
           }
