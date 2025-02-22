@@ -208,7 +208,7 @@ export async function resolveHistoryVar(historyOpt) {
  * @param {number} storiesMax 
  * @param {string} storiesDir 
  * 
- * @returns {Promise<Map<number, StorySummary[]>>}
+ * @returns {Promise<Map<number, StorySummary[]>>} Paged story summaries.
  */
 async function fetchStorySummaries(index, startPage, storiesMax, storiesDir) {
   // @next in this context refers to last+1 instead of previous+1
@@ -219,7 +219,6 @@ async function fetchStorySummaries(index, startPage, storiesMax, storiesDir) {
   const pageNumber = await resolvePageVar(startPage, lastPageNumber, index.name)
 
   // fetch stories from requested index
-  
   const pagedStories = await reader.fetchStories(
     index, 
     pageNumber, 
@@ -609,7 +608,9 @@ async function createProfile(storyText, textPath, replaceIfExists) {
  * @param {string|undefined} storyPrev Previous story id.
  * @param {boolean} cycle Whether loop execution, prompting for user input.
  * 
- * @returns {Promise<undefined>}
+ * @returns {Promise<undefined|{
+ *  fetchedPagedStories: Map<number, StorySummary[]>|undefined
+ * }>} If looped, no return. Else, fetched stories.
  */
 export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   // runtime args
@@ -634,8 +635,12 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   ])
 
   // fetch new story summaries
+  /**
+   * @type {Map<number, StorySummary[]>|undefined}
+   */
+  let fetchedPagedStories
   if (args.fetchStoriesIndex !== undefined && !args.autopilot) {
-    await fetchStorySummaries(
+    fetchedPagedStories = await fetchStorySummaries(
       getStoriesIndex(args.fetchStoriesIndex),
       args.page,
       args.fetchStoriesMax,
@@ -952,5 +957,8 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   }
   else {
     logger.info('end main without cycle')
+    return {
+      fetchedPagedStories
+    }
   }
 }
