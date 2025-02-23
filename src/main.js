@@ -205,12 +205,14 @@ export async function resolveHistoryVar(historyOpt) {
 /**
  * @param {StoriesIndex} index 
  * @param {string} startPage
+ * @param {string|undefined} startStory
  * @param {number} storiesMax 
  * @param {string} storiesDir 
+ * @param {string|undefined} storyPrev
  * 
  * @returns {Promise<Map<number, StorySummary[]>>} Paged story summaries.
  */
-async function fetchStorySummaries(index, startPage, storiesMax, storiesDir) {
+async function fetchStorySummaries(index, startPage, startStory, storiesMax, storiesDir, storyPrev) {
   // @next in this context refers to last+1 instead of previous+1
   // Math.max returns -infinity if no local pages exist
   const lastPageNumber = Math.max(
@@ -218,10 +220,22 @@ async function fetchStorySummaries(index, startPage, storiesMax, storiesDir) {
   )
   const pageNumber = await resolvePageVar(startPage, lastPageNumber, index.name)
 
+  let storyArrayIndex = 0
+  if (startStory !== undefined) {
+    let story
+    ({ story, storyArrayIndex } = await resolveStoryVar(
+      startStory, storyPrev, IndexPage.getPath(index.name, pageNumber, storiesDir)
+    ))
+    if (typeof story === 'number') {
+      storyArrayIndex = 0
+    }
+  }
+
   // fetch stories from requested index
   const pagedStories = await reader.fetchStories(
     index, 
-    pageNumber, 
+    pageNumber,
+    storyArrayIndex,
     storiesMax, 
     storiesDir
   )
@@ -643,8 +657,10 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     fetchedPagedStories = await fetchStorySummaries(
       getStoriesIndex(args.fetchStoriesIndex),
       args.page,
+      args.story,
       args.fetchStoriesMax,
-      args.storiesDir
+      args.storiesDir,
+      storyPrev
     )
   }
   else {
@@ -657,8 +673,10 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
    */
   let indexPages
 
-  // show available local story lists if no story selected
+  // show available local index pages if no story selected
   if (
+    // Don't show index pages if single or start story is defined. 
+    // Latter case is normally only used by autopilot, so displaying index pages is redundant.
     args.story === undefined
     && args.localStoryFile === undefined
     && args.showLibrary === undefined
@@ -828,7 +846,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   // fetch story
   await (
     (async () => {
-      if (args.story !== undefined) {
+      if (args.story !== undefined && args.fetchStoriesIndex === undefined) {
         // resolve index alias
         args.index = getStoriesIndex(args.index).name
 

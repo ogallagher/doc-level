@@ -4,6 +4,7 @@ import { main } from './main.js'
 import { listStoryIndexPages, loadStories } from './reader.js'
 import { LibraryBook } from './library.js'
 import { LibrarySearchEntry } from './librarySearchEntry.js'
+import { OPT_VAR_PREFIX } from './config.js'
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {import('./config.js').Args} Args
@@ -87,7 +88,8 @@ export async function autopilot(args, storyArrayIndex, books=[]) {
         [
           '--fetch-stories-index', args.index,
           '--fetch-stories-max', args.fetchStoriesMax,
-          '--page', args.page
+          '--page', args.page,
+          '--story', `${OPT_VAR_PREFIX}${storyArrayIndex}` 
         ].concat(constArgs),
         undefined, undefined, false
       )

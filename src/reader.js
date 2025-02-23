@@ -223,17 +223,21 @@ export function loadPrompt(templatePath, ...args) {
  * Fetch story summaries from an index/listing online.
  * 
  * @param {StoriesIndex} storiesIndex 
- * @param {number|undefined} startPage
+ * @param {number|undefined} startPage First index page number.
+ * @param {number|undefined} startStoryArrIdx First story array index. Affects from where to begin counting fetched
+ * stories until `storiesMax`.
  * @param {number} storiesMax Max count of stories to fetch. Note the actual count of stories returned
  * will be rounded up to nearest whole page.
- * @param {string} storiesParentDir 
- * @returns {Promise<Map<number, StorySummary[]>>} Paged list of stories.
+ * @param {string} storiesParentDir
+ * 
+ * @returns {Promise<Map<number, StorySummary[]>>} Paged lists of stories, including pages that were
+ * already in local filesystem.
  */
-export function fetchStories(storiesIndex, startPage, storiesMax, storiesParentDir) {
+export function fetchStories(storiesIndex, startPage, startStoryArrIdx, storiesMax, storiesParentDir) {
   let pageNumber = startPage === undefined ? storiesIndex.pageNumberMin : startPage
   logger.info(
-    'fetch up to %s stories from %s as of page %s and save to %s', 
-    storiesMax, storiesIndex, pageNumber, storiesParentDir
+    'fetch up to %s stories from %s as of page %s story @%s and save to %s', 
+    storiesMax, storiesIndex, pageNumber, startStoryArrIdx, storiesParentDir
   )
   let storiesCount = 0
   /**
@@ -328,7 +332,15 @@ export function fetchStories(storiesIndex, startPage, storiesMax, storiesParentD
 
       pagedStories.set(pageNumber, storySummaries)
 
-      storiesCount += storySummaries.length
+      if (startStoryArrIdx !== undefined) {
+        // only count stories after array start index in first page
+        storiesCount += storySummaries.length - startStoryArrIdx
+        startStoryArrIdx = undefined
+      }
+      else {
+        storiesCount += storySummaries.length
+      }
+      
       pageNumber++
 
       // recursive call for next page

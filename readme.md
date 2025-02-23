@@ -1374,7 +1374,7 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 | `-f, --fetch-stories-index` | Fetch stories from a registered index/listing website. | |
 | `-F, --local-story-file` | Load an isolated story from a local full text file path. Use this if you already have a local text file to analyze. During load, `doc-level` will prompt for basic metadata in order to tag the story in the library. These stories will be assigned to a special stories index called `local`. | |
 | `-m, --fetch-stories-max` | Max number of stories to fetch. | `-f` |
-| `-s, --story` | Identifier of a story to be loaded and profiled. | |
+| `-s, --story` | Identifier of a story to be loaded and profiled. If combined with `-f` or `-a`, defines the story from which to begin. | |
 | `-i, --index` | Stories index/listing name. | `-s` |
 | `-p, --page` | Page number within stories index. If combined with `-f`, provides page from which to start fetch. | `-s` or `-f` |
 | `-n, --story-length-max` | Max character length of story text to include when generating its profile. | `-s` |
