@@ -764,17 +764,19 @@ export async function loadStory(pagePath, storyId) {
 /**
  * 
  * @param {string} storyId 
+ * @param {string} indexName
  * @param {string} profilesDir
  * 
  * @returns {Promise<string>}
  */
-export async function getProfilePath(storyId, profilesDir) {
+export async function getProfilePath(storyId, indexName, profilesDir) {
   const profilePattern = new RegExp(regexpEscape(`story-${storyId}`) + '/.+profile.json$')
   logger.debug('story %s profile search pattern=%s', storyId, profilePattern)
-
-  const storyPaths = await listFiles(profilesDir, profilePattern)
+  
+  const indexProfilesDir = path.join(profilesDir, indexName)
+  const storyPaths = await listFiles(indexProfilesDir, profilePattern)
   if (storyPaths.length !== 1) {
-    throw new Error(`unable to find profile for story ${storyId} at ${profilesDir}`, {
+    throw new Error(`unable to find profile for story ${storyId} at ${indexProfilesDir}`, {
       cause: {
         candidatePaths: storyPaths
       }

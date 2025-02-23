@@ -135,7 +135,7 @@ export async function getLibrary(indexPages, profilesDir) {
            */
           let profile
           try {
-            profile = await getProfilePath(story.id, profilesDir).then(loadProfile)
+            profile = await getProfilePath(story.id, page.indexName, profilesDir).then(loadProfile)
           }
           catch (err) {
             logger.debug('no profile found for story=%s', story.id)

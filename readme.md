@@ -12,7 +12,7 @@ Implemented by integrating OpenAI API language models with automated fetch and p
 - Topics, genres, categories.
 
 <details>
-<summary>Other <code>TextProfile</code> attributes</summary>
+<summary>Most <code>TextProfile</code> attributes</summary>
 
 OpenAI model = `chat.completions`
 

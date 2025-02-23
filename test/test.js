@@ -130,7 +130,7 @@ describe('reader', function() {
 
   describe('#loadProfile', function() {
     it('loads a profile when available', function() {
-      return getProfilePath('142', 'test/resource/profiles')
+      return getProfilePath('142', 'index1', 'test/resource/profiles')
       .then(loadProfile)
       .then((profile) => {
         assert.ok(profile instanceof textProfile.TextProfile)
