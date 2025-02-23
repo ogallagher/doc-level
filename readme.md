@@ -1179,7 +1179,7 @@ Open this profile in an editor.
 
 ## Autopilot
 
-Once you're comfortable with results from profiling stories one at a time, you can use `--autopilot` to queue a list of stories to be profiled without user intervention.
+Once we're comfortable with results from profiling stories one at a time, we can use `--autopilot` to queue a list of stories to be profiled without user intervention.
 
 The `-m` limiter both when defining the start story with `-s`, and when passing in results from search history with `-H`.
 
@@ -1192,7 +1192,7 @@ The `-m` limiter both when defining the start story with `-s`, and when passing 
 launch autopilot
 ...
 fetched pages of 20 story summaries
-queued 20 story processors across 2 page processors
+queued 20 story processors
 select index=internet page=2 story=1629
 select index=internet page=2 story=1630
 select index=internet page=2 story=1631
@@ -1350,6 +1350,33 @@ Same result, using set intersection with negative condition.
 ```shell
 [opts]: -? "(t == 'publish-date' ^ q == '/2000-.+/') && (t != 'bailey buchemi')"
 ```
+
+## Search history
+
+Every library search will create an entry in search history. These can be viewed time descending with `-H <n>`, where `<n>` is optionally how many entries to show. History entry files are assigned a monotonically increasing integer. You can delete unwanted history entry files and will see the missing entry numbers reflected in the output of `-H`.
+
+```txt
+[opts]: -H 3
+
+Library search history: show latest 3 until Infinity
+[32] @2025-02-22T18:56:04.860Z x22
+        ((-? "((t == 'years-of-education') && t == '문장웹진' && (t == 'reading-level' ^ q == 'high school')) - (t == 'maturity' ^ q == 'restricted')" -> asc -L txt))
+        [data/renders/library_search-expr=t-years-of-education-&&-t-문장웹진-&&-t-reading-level-^-q-high-school---t-maturity-^-q-restricted.txt]
+[31] @2025-02-22T18:53:21.138Z x66
+        ((-? "((t == 'years-of-education') && t == '문장웹진') - (t == 'maturity' ^ q == 'restricted')" -> asc -L txt))
+        [data/renders/library_search-expr=t-years-of-education-&&-t-문장웹진---t-maturity-^-q-restricted.txt]
+[29] @2025-02-22T18:45:34.398Z x21
+        ((-? "(t == 'years-of-education') && (t == 'maturity' ^ q == 'restricted')" -> asc -L txt))
+        [data/renders/library_search-expr=t-years-of-education-&&-t-maturity-^-q-restricted.txt]
+```
+
+Each entry includes the result count, input options, and rendered result file path.
+
+### Library search as input to autopilot
+
+Instead of specifying a start story and count, you can pass the result of a library search to `--autopilot` by combining with `-H <n>`, where `<n>` is the **search entry number** instead of a count.
+
+From the above example, `-a -H 21` would pass in **21** stories for autopilot to process.
 
 ## Terms
 
