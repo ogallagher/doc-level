@@ -300,6 +300,11 @@ export const argParser = (
     description: 'Local directory where activity history (ex. library search history) is saved.',
     default: path.join('data', 'history')
   })
+  .option('tags-dir', {
+    type: 'string',
+    description: 'Local directory where user defined custom tags are saved.',
+    default: path.join('data', 'tags')
+  })
   .option('log-level', {
     alias: 'l',
     type: 'string',
@@ -342,6 +347,8 @@ argParser.wrap(argParser.terminalWidth())
  *  tag: string | undefined,
  *  query: string | RegExp | undefined,
  *  searchExpr: string | undefined,
+ *  customTag: string | undefined,
+ *  tagsDir: string,
  *  sort: string,
  *  help: boolean
  * }} Args

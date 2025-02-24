@@ -1385,8 +1385,8 @@ User defined custom tags and connections are provided through the `-T/--custom-t
 | tag operation | syntax | description |
 | --- | --- | --- |
 | create tag | `+t['tag-name']` | Creates a new tag if not exists. User defined custom tags are automatically connected as children of `custom-tag`. |
-| delete tag | `-t['tag-name']` | Deletes a tag if exists, and if child of `custom-tag` (`doc-level` defined tags cannot be deleted). |
-| connect parent to child tag | `t['parent'] += t['child']` | Defining a connection with a tag that does not exist will implicitly define a new tag. |
+| delete tag | `-t['tag-name']` | Deletes a tag if exists, and if child of `custom-tag`. `doc-level` generated tags can technically be deleted during a session, but will be restored the next time that the library loads from local filesystem. |
+| connect parent to child tag | `t['parent'] += t['child']` | Defining a connection with a tag that does not exist will fail; tags must be defined before they are connected. |
 | disconnect tags | `t['tag-1'] -= t['tag-2']` | If as a result a tag has no connections, the tag is **not deleted** automatically. |
 | connect tag to story | `t['tag-name'] += s['index-name']['story-id']` | `index-name` is required because story ids as derived from each stories index are only guaranteed unique within that index. |
 | disconnect tag to story | `t['tag-name] -= s['index-name']['story-id']` | |
@@ -1394,12 +1394,14 @@ User defined custom tags and connections are provided through the `-T/--custom-t
 For example, let's define a tag `read-date` for whether I've read a story, and when. Then, we'll connect it to a story to say that I read it on 1 January 2001.
 
 ```shell
-[opts]: -T "t['read-date'] += t['2001-01-01']; t['2001-01-01'] += s['index-1']['jungle-book_1234']"
+[opts]: -T "+t['read-date']; +t['2001-01-01']; t['read-date'] += t['2001-01-01']; t['2001-01-01'] += s['index-1']['jungle-book_1234']"
 ```
 
-Above statements could have been broken into 2 separate inputs.
+Above statements could have been broken into 4 separate inputs.
 
 ```shell
+[opts]: -T "+t['read-date']" 
+[opts]: -T "+t['2001-01-01']" 
 [opts]: -T "t['read-date'] += t['2001-01-01']" 
 [opts]: -T "t['2001-01-01'] += s['index-1']['jungle-book_1234']"
 ```

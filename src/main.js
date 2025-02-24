@@ -9,11 +9,12 @@ import { getStoriesIndex } from './storiesIndex/index.js'
 import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { LOCAL_INDEX_NAME } from './storiesIndex/LocalStoriesIndex.js'
 import { StorySummary } from './storySummary.js'
-import { dateToString, fileString } from './stringUtil.js'
+import { fileString } from './stringUtil.js'
 import { IndexPage } from './indexPage.js'
 import { flushCliLogStream } from './pinoCliLogTransport.js'
 import { autopilot } from './autopilot.js'
 import { LibrarySearchEntry } from './librarySearchEntry.js'
+
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {import('./librarySearchEntry.js').BookReference} BookReference
@@ -613,6 +614,22 @@ async function createProfile(storyText, textPath, replaceIfExists) {
 }
 
 /**
+ * @param {string} tagsDir 
+ */
+function saveCustomTags(tagsDir) {
+  if (library !== undefined) {
+    const saveTagsPath = path.join(tagsDir, `${lib.Library.tCustom.name}.json`)
+    console.log(`save custom tags to ${saveTagsPath}`)
+    let customTags = lib.getCustomTags()
+    writer.writeText(
+      '[' + customTags.map((t) => t.toString()).join(',') + ']', 
+      saveTagsPath,
+      true
+    )
+  }
+}
+
+/**
  * Looping program execution. End of each lap pauses for next set of arguments before
  * passing as input to the next.
  * 
@@ -630,6 +647,12 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   // runtime args
   const args = await config.loadArgs(argSrc)
 
+  // register process.exit listeners
+  process.removeAllListeners('exit')
+  process.on('exit', () => {
+    saveCustomTags(args.tagsDir)
+  })
+
   if (args.help) {
     await config.argParser.getHelp()
       .then((prompt) => {
@@ -646,6 +669,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     writer.initDir(args.storiesDir),
     writer.initDir(args.profilesDir),
     writer.initDir(path.join(args.historyDir, config.SEARCHES_DIR)),
+    writer.initDir(args.tagsDir)
   ])
 
   // fetch new story summaries
@@ -681,6 +705,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     && args.localStoryFile === undefined
     && args.showLibrary === undefined
     && args.showHistory === undefined
+    && args.customTag === undefined
     && !args.help
   ) {
     indexPages = await reader.listStoryIndexPages(args.storiesDir)
@@ -732,10 +757,8 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     }
   }
 
-  // load and search library
-  if (args.showLibrary !== undefined) {
-    logger.info('show library in format=%s', args.showLibrary)
-
+  // load library and custom tags
+  if (args.showLibrary !== undefined || args.customTag !== undefined) {
     if (args.reload || library === undefined) {
       logger.info('load library from filesystem')
 
@@ -753,10 +776,23 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
           .flat(),
         args.profilesDir
       )
+
+      const tagsPath = path.join(args.tagsDir, `${lib.Library.tCustom.name}.json`)
+      if (await writer.fileExists(tagsPath)) {
+        await reader.loadText(tagsPath)
+        .then((tagsJson) => {
+          lib.loadCustomTags(library, tagsJson)
+        })
+      }
     }
     else {
       logger.info('use existing library from memory')
     }
+  }
+
+  // load and search library
+  if (args.showLibrary !== undefined) {
+    logger.info('show library in format=%s', args.showLibrary)
 
     // open library render file
     await writer.initDir(args.rendersDir)
@@ -821,6 +857,11 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
 
     renderFile.close()
     console.log('view library at %s', renderPath)
+  }
+
+  // custom tagging
+  if (args.customTag !== undefined) {
+    [...library.execTaggingExpression(args.customTag)]
   }
 
   /**

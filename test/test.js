@@ -10,7 +10,7 @@ import { loadPrompt, loadText, init as readerInit, setPromptDir, parseHtml, redu
 import { init as siInit, getStoriesIndex } from '../src/storiesIndex/index.js'
 import { StoriesIndex } from '../src/storiesIndex/storiesIndex.js'
 import { MunjangStoriesIndex } from '../src/storiesIndex/MunjangStoriesIndex.js' 
-import { getTagLineageName, Library, LibraryBook, init as libraryInit } from '../src/library.js'
+import { getCustomTags, getTagLineageName, Library, LibraryBook, init as libraryInit, loadCustomTags } from '../src/library.js'
 import { IndexPage } from '../src/indexPage.js'
 import { StorySummary } from '../src/storySummary.js'
 import { LibraryDescriptor } from '../src/libraryDescriptor.js'
@@ -370,6 +370,21 @@ describe('library', () => {
     })
   })
 
+  describe('#getCustomTags, #loadCustomTags', () => {
+    it('saves and loads custom tags and connected books', () => {
+      [...library.execTaggingExpression(`+t['starts-with-a']; t['starts-with-a'] += s['index1']['aa']`)]
+      let t = rt.get('starts-with-a')
+      assert.ok(t.connections.has(bookA))
+
+      let tags = getCustomTags()
+      let tagsJson = `[${tags.map((tag) => tag.toString()).join(',')}]`
+      t.disconnect_to(bookA)
+
+      loadCustomTags(library, tagsJson)
+      assert.ok(t.connections.has(bookA))
+    })
+  })
+
   describe('Library', () => {
     before(() => {
       [book1, book2].forEach((book) => library.addBook(book))
@@ -648,6 +663,7 @@ describe('library', () => {
         let res = [...library.execTaggingExpression(`+t['t1'];`)]
         assert.strictEqual(res.length, 1)
         assert.strictEqual(res[0].name, 't1')
+        assert.strictEqual(rt.graph_distance(Library.tCustom, rt.get('t1')), 1)
 
         res = [...library.execTaggingExpression(`+t['t1']; +t['t2']`)]
         assert.strictEqual(res.length, 2)
@@ -655,16 +671,30 @@ describe('library', () => {
       })
 
       it('deletes tags', () => {
+        let t1 = rt.new('t1')
+        let t2 = rt.new('t2')
         let res = [...library.execTaggingExpression(`-t['t1'];`)]
         assert.strictEqual(res.length, 1)
         assert.strictEqual(res[0].name, 't1')
+        assert.ok(!rt.known(t1))
+        assert.ok(rt.known(t2))
 
         res = [...library.execTaggingExpression(`-t['t1']; -t['t2']`)]
         assert.strictEqual(res.length, 2)
         assert.deepStrictEqual(res.map((t) => t.name), ['t1', 't2'])
       })
 
+      it('fails to connect missing tags', () => {
+        assert.throws(
+          () => {
+            [...library.execTaggingExpression(`t['t1'] += t['t0']`)]
+          }
+        )
+      })
+
       it('connects tags to tags and stories', () => {
+        [...library.execTaggingExpression(`+t['t1']; +t['t2']`)]
+
         let res = [...library.execTaggingExpression(`t['t1'] += t['t2']`)]
         assert.strictEqual(res.length, 1)
         assert.deepStrictEqual(res[0].map((t) => t.name), ['t1', 't2'])
@@ -678,13 +708,13 @@ describe('library', () => {
               return n.name
             }
             else {
-              return n.id
+              return [n.indexPage.indexName, n.story.id]
             }
           }), 
-          ['t2', bookA.story.id]
+          ['t2', [bookA.indexPage.indexName, bookA.story.id]]
         )
-        assert.strictEqual(rt.graph_distance(rt.get('t2'), bookA.story), 1)
-        assert.strictEqual(rt.graph_distance(rt.get('t1'), bookA.story), 2)
+        assert.strictEqual(rt.graph_distance(rt.get('t2'), bookA), 1)
+        assert.strictEqual(rt.search_entities_by_tag(rt.get('t1'), TYPE_TO_TAG_CHILD, false)[0], bookA)
       })
     })
   })

@@ -99,6 +99,56 @@ export function init(parentLogger) {
 }
 
 /**
+ * @returns All descendant tags and books of custom-tag.
+ */
+export function getCustomTags() {
+  /**
+   * @type {Map<RelationalTag, RelationalTagConnection[]>}
+   */
+  let customTags = RelationalTag._search_descendants(Library.tCustom, TYPE_TO_TAG_CHILD, false, true, null)
+  logger.info('found %s descendant tags of %', customTags.size, Library.tCustom.name)
+
+  return [Library.tCustom, ...customTags.keys()]
+}
+
+/**
+ * Load serialized custom tags and connected books.
+ * 
+ * @param {Library} library
+ * @param {string} json 
+ * @param {boolean} tagsAreStringified
+ * 
+ * @returns {RelationalTag[]}
+ */
+export function loadCustomTags(library, json) {
+  let customTags = RelationalTag.load_json(json, true, false)
+  logger.info('loaded %s descendant tags of %s', customTags.length, Library.tCustom.name)
+
+  // assign deserialized LibraryBook raw object tags to LibraryBook instances
+  /**
+   * @type {LibraryBook[]}
+   */
+  let taggedBooks = RelationalTag.search_entities_by_tag(
+    Library.tCustom, TYPE_TO_TAG_CHILD, false
+  ).filter((b) => !(b instanceof LibraryBook))
+  logger.info('loaded %s descendant raw book objects of %s', taggedBooks.length, Library.tCustom)
+  for (let bookObj of taggedBooks) {
+    // get book
+    const book = library.getBook(bookObj.indexPage.indexName, bookObj.story.id)
+
+    // assign bookObj tags to book
+    for (let tag of RelationalTag._tagged_entities.get(bookObj).keys()) {
+      RelationalTag.connect(tag, book)
+    }
+
+    // remove raw bookObj from tags graph
+    RelationalTag.delete_entity(bookObj)
+  }
+
+  return customTags
+}
+
+/**
  * Create a {@link Library} instance from the given filesystem.
  * 
  * Everything from previous `Library` instances is replaced.
@@ -483,6 +533,11 @@ export function *exportLibrary(library, format, startTagName, query, searchExpr,
  * All items within the library are organized using [relational tagging](https://github.com/ogallagher/relational_tags).
  */
 export class Library extends LibraryDescriptor {
+  /**
+   * Parent tag of all user defined custom tags.
+   */
+  static get tCustom() { return RelationalTag.get('custom-tag') }
+
   constructor() {
     // library is root of hierarchy; no parent
     super(undefined)
@@ -787,14 +842,21 @@ export class Library extends LibraryDescriptor {
   }
 
   /**
-   * @typedef {RelationalTag|StorySummary} TaggingNode
+   * @typedef {RelationalTag|LibraryBook} TaggingNode
    */
   /**
+   * Execute tagging expression of one or more tag operation statements.
+   * 
+   * Note that unlike doc-level tags, custom tags will connect directly to {@linkcode LibraryBook} instances, 
+   * instead of their descriptors.
+   * 
    * @param {SearchExpression} expr 
+   * @param {boolean} accessNewTag If expression contains a tag reference, whether the tag is allowed not
+   * to exist yet.
    * 
    * @returns {Generator<TaggingNode|[TaggingNode, TaggingNode]>}
    */
-  *execTaggingExpression(expr) {
+  *execTaggingExpression(expr, accessNewTag=false) {
     if (!Array.isArray(expr)) {
       logger.debug('raw tagging expr="%s"', expr)
       /**
@@ -823,12 +885,13 @@ export class Library extends LibraryDescriptor {
       }
     }
     else if ([TAGS_ADD, TAGS_DEL, TAGS_CONN, TAGS_DISC].indexOf(op) !== -1) {
-      let tag = [...this.execTaggingExpression(a)][0]
+      let tag = [...this.execTaggingExpression(a, op === TAGS_ADD || op === TAGS_DEL)][0]
       if (!(tag instanceof RelationalTag)) {
         throw new Error(`cannot create ${tag} if not instance of RelationalTag`)
       }
       
       if (op === TAGS_ADD) {
+        Library.tCustom.connect_to(tag, TYPE_TO_TAG_CHILD)
         console.log(`create tag if not exists "${getTagLineageName(tag, '.', '...')}"`)
         yield tag
       }
@@ -839,7 +902,7 @@ export class Library extends LibraryDescriptor {
       }
       else if (op === TAGS_CONN || op === TAGS_DISC) {
         let target = [...this.execTaggingExpression(b)][0]
-        if (!(target instanceof RelationalTag || target instanceof StorySummary)) {
+        if (!(target instanceof RelationalTag || target instanceof LibraryBook)) {
           throw new Error(`cannot connect to ${target} if not a tag or story`)
         }
 
@@ -862,9 +925,9 @@ export class Library extends LibraryDescriptor {
           throw new Error(`failed to parse tag reference ${JSON.stringify(b)} from access expression ${JSON.stringify(expr)}`)
         } 
 
-        yield RelationalTag.get(b[1])
+        yield RelationalTag.get(b[1], accessNewTag)
       }
-      // get story
+      // get book
       else {
         const [sExpr, sIdExpr] = [a, b]
         const [_op, sVar, siNameExpr] = sExpr
@@ -877,23 +940,9 @@ export class Library extends LibraryDescriptor {
         if (sVar !== TAGS_S || siNameExpr.length !== 2) {
           throw new Error(`failed to parse stories index reference ${JSON.stringify(siNameExpr)} from access expression ${JSON.stringify(expr)}`)
         }
-        const indexName = siNameExpr[1]
+        const indexName = getStoriesIndex(siNameExpr[1]).name
 
-        const resBooks = [
-          ...this.execSearchExpression([
-            `t == '${StorySummary.tId.name}' ^ q == '${storyId}'`,
-            `t == '${StoriesIndex.tName.name}' ^ q == '${indexName}'`
-          ].join(' && '))
-        ]
-        if (resBooks.length !== 1) {
-          throw new Error(`failed to get single book for story access expression ${JSON.stringify(expr)}`, {
-            cause: {
-              resultBooks: resBooks
-            }
-          })
-        }
-
-        yield resBooks[0][0].story
+        yield this.getBook(indexName, storyId)
       }
     }
     else {
@@ -1102,9 +1151,39 @@ export class Library extends LibraryDescriptor {
     }
   }
 
+  /**
+   * Get a book by index name and story id. 
+   * 
+   * Implemented using tag search, but performance could be improved by updating `Library._getKey` to exclude
+   * page number from a book's unique key.
+   * 
+   * @param {string} indexName 
+   * @param {string} storyId 
+   * 
+   * @returns {LibraryBook}
+   */
+  getBook(indexName, storyId) {
+    const resBooks = [
+      ...this.execSearchExpression([
+        `t == '${StorySummary.tId.name}' ^ q == '${storyId}'`,
+        `t == '${StoriesIndex.tName.name}' ^ q == '${indexName}'`
+      ].join(' && '))
+    ]
+    if (resBooks.length !== 1) {
+      throw new Error(`failed to get single book for index-name=${indexName} story-id=${storyId}`, {
+        cause: {
+          resultBooks: resBooks
+        }
+      })
+    }
+
+    return resBooks[0][0]
+  }
+
   static initTags() {
     this.adoptTag(LibraryBook.t)
     this.adoptTag(StoriesIndex.t)
+    this.adoptTag(Library.tCustom)
   }
 
   setTags() {

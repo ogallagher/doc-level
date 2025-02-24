@@ -5,7 +5,7 @@ import {
   mkdir,
   open
 } from 'fs/promises'
-import { createWriteStream } from 'fs'
+import { createWriteStream, writeFileSync } from 'fs'
 import axios from 'axios'
 import { v4 as uuidv4 } from 'uuid'
 /**
@@ -44,9 +44,14 @@ export function init(parentLogger) {
  * @param {string} text 
  * @param {string|FileHandle} path Path to file, or a writable file handle (ex. output of `openFile`). If
  * file handle, this method assumes the caller will close the file handle on completion.
- * @returns {Promise<undefined>}
+ * @param {boolean} sync Whether to perform write synchronously.
+ * @returns {Promise<undefined>|undefined}
  */
-export function writeText(text, path) {
+export function writeText(text, path, sync=false) {
+  if (sync) {
+    writeFileSync(path, text, {encoding: 'utf-8'})
+  }
+  else {
     return new Promise(function(res, rej) {
       writeFile(path, text, {encoding: 'utf-8'})
       .then(
@@ -60,6 +65,7 @@ export function writeText(text, path) {
         }
       )
     })
+  }
 }
 
 /**
