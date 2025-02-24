@@ -7,7 +7,7 @@ import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
 import { loadText, loadProfile, getProfilePath } from './reader.js'
-import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT, SEARCH_OP_NEQ, SEARCH_OP_NOT } from './config.js'
+import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT, SEARCH_OP_NEQ, SEARCH_OP_NOT, TAGS_STMT_DELIM, TAGS_ADD, TAGS_DEL, TAGS_CONN, TAGS_DISC, TAGS_ACCESS, TAGS_T, TAGS_S } from './config.js'
 import { compileRegexp } from './stringUtil.js'
 import { LibrarySearchEntry } from './librarySearchEntry.js'
 /**
@@ -783,6 +783,121 @@ export class Library extends LibraryDescriptor {
     }
     else {
       throw new Error(`unsupported operator ${op} in search expression ${expr}`)
+    }
+  }
+
+  /**
+   * @typedef {RelationalTag|StorySummary} TaggingNode
+   */
+  /**
+   * @param {SearchExpression} expr 
+   * 
+   * @returns {Generator<TaggingNode|[TaggingNode, TaggingNode]>}
+   */
+  *execTaggingExpression(expr) {
+    if (!Array.isArray(expr)) {
+      logger.debug('raw tagging expr="%s"', expr)
+      /**
+       * @type {SearchExpression}
+       */
+      expr = parseExpr(expr)
+      logger.debug('parsed tagging expr as %o', expr)
+    }
+    // else, expression already parsed and ready for execution
+
+    if (!Array.isArray(expr)) {
+      throw new Error(`failed to parse tagging expression ${expr}`, {
+        cause: expr
+      })
+    }
+
+    const [op, a, b] = expr
+
+    if (op === TAGS_STMT_DELIM) {
+      const stmts = expr.slice(1).filter((term) => term !== null)
+      logger.debug('parsed %s statements from tagging expression %o', stmts.length, expr)
+      for (let stmt of stmts) {
+        for (let res of this.execTaggingExpression(stmt)) {
+          yield res
+        }
+      }
+    }
+    else if ([TAGS_ADD, TAGS_DEL, TAGS_CONN, TAGS_DISC].indexOf(op) !== -1) {
+      let tag = [...this.execTaggingExpression(a)][0]
+      if (!(tag instanceof RelationalTag)) {
+        throw new Error(`cannot create ${tag} if not instance of RelationalTag`)
+      }
+      
+      if (op === TAGS_ADD) {
+        console.log(`create tag if not exists "${getTagLineageName(tag, '.', '...')}"`)
+        yield tag
+      }
+      else if (op === TAGS_DEL) {
+        console.log(`delete tag if exists "${getTagLineageName(tag, '.', '...')}"`)
+        RelationalTag.delete(tag)
+        yield tag
+      }
+      else if (op === TAGS_CONN || op === TAGS_DISC) {
+        let target = [...this.execTaggingExpression(b)][0]
+        if (!(target instanceof RelationalTag || target instanceof StorySummary)) {
+          throw new Error(`cannot connect to ${target} if not a tag or story`)
+        }
+
+        if (op === TAGS_CONN) {
+          let conn = RelationalTag.connect(tag, target, (target instanceof RelationalTag) ? TYPE_TO_TAG_CHILD : undefined)
+          console.log(`create connection ${conn}`)
+        }
+        else if (op === TAGS_DISC) {
+          RelationalTag.disconnect(tag, target)
+          console.log(`disconnect ${tag} from ${target}`)
+        }
+
+        yield [tag, target]
+      }
+    }
+    else if (op === TAGS_ACCESS) {
+      // get tag
+      if (a === TAGS_T) {
+        if (b.length !== 2) {
+          throw new Error(`failed to parse tag reference ${JSON.stringify(b)} from access expression ${JSON.stringify(expr)}`)
+        } 
+
+        yield RelationalTag.get(b[1])
+      }
+      // get story
+      else {
+        const [sExpr, sIdExpr] = [a, b]
+        const [_op, sVar, siNameExpr] = sExpr
+
+        if (sIdExpr.length !== 2) {
+          throw new Error(`failed to parse story reference ${JSON.stringify(sExpr)} from access expression ${JSON.stringify(expr)}`)
+        }
+        const storyId = sIdExpr[1]
+
+        if (sVar !== TAGS_S || siNameExpr.length !== 2) {
+          throw new Error(`failed to parse stories index reference ${JSON.stringify(siNameExpr)} from access expression ${JSON.stringify(expr)}`)
+        }
+        const indexName = siNameExpr[1]
+
+        const resBooks = [
+          ...this.execSearchExpression([
+            `t == '${StorySummary.tId.name}' ^ q == '${storyId}'`,
+            `t == '${StoriesIndex.tName.name}' ^ q == '${indexName}'`
+          ].join(' && '))
+        ]
+        if (resBooks.length !== 1) {
+          throw new Error(`failed to get single book for story access expression ${JSON.stringify(expr)}`, {
+            cause: {
+              resultBooks: resBooks
+            }
+          })
+        }
+
+        yield resBooks[0][0].story
+      }
+    }
+    else {
+      throw new Error(`unsupported tagging operator ${op} in expression "${expr.join(' ')}"`)
     }
   }
 

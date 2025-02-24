@@ -1,7 +1,7 @@
 import assert from 'assert'
 import pino from 'pino'
 import path from 'path'
-import { RelationalTag as rt } from 'relational_tags'
+import { RelationalTag, RelationalTag as rt } from 'relational_tags'
 import { TYPE_TO_TAG_CHILD } from '../src/config.js'
 import * as textProfile from '../src/textProfile.js'
 import * as messageSchema from '../src/messageSchema.js'
@@ -640,6 +640,51 @@ describe('library', () => {
           let resB = prepareSearchResult(library.execSearchExpression(seB))
           assert.deepStrictEqual(resA, resB)
         }
+      })
+    })
+
+    describe('#execTaggingExpression', () => {
+      it('creates tags', () => {
+        let res = [...library.execTaggingExpression(`+t['t1'];`)]
+        assert.strictEqual(res.length, 1)
+        assert.strictEqual(res[0].name, 't1')
+
+        res = [...library.execTaggingExpression(`+t['t1']; +t['t2']`)]
+        assert.strictEqual(res.length, 2)
+        assert.deepStrictEqual(res.map((t) => t.name), ['t1', 't2'])
+      })
+
+      it('deletes tags', () => {
+        let res = [...library.execTaggingExpression(`-t['t1'];`)]
+        assert.strictEqual(res.length, 1)
+        assert.strictEqual(res[0].name, 't1')
+
+        res = [...library.execTaggingExpression(`-t['t1']; -t['t2']`)]
+        assert.strictEqual(res.length, 2)
+        assert.deepStrictEqual(res.map((t) => t.name), ['t1', 't2'])
+      })
+
+      it('connects tags to tags and stories', () => {
+        let res = [...library.execTaggingExpression(`t['t1'] += t['t2']`)]
+        assert.strictEqual(res.length, 1)
+        assert.deepStrictEqual(res[0].map((t) => t.name), ['t1', 't2'])
+        assert.strictEqual(rt.graph_distance(rt.get('t1'), rt.get('t2')), 1)
+
+        res = [...library.execTaggingExpression(`t['t2'] += s['index1']['aa']`)]
+        assert.strictEqual(res.length, 1)
+        assert.deepStrictEqual(
+          res[0].map((n) => {
+            if (n instanceof RelationalTag) {
+              return n.name
+            }
+            else {
+              return n.id
+            }
+          }), 
+          ['t2', bookA.story.id]
+        )
+        assert.strictEqual(rt.graph_distance(rt.get('t2'), bookA.story), 1)
+        assert.strictEqual(rt.graph_distance(rt.get('t1'), bookA.story), 2)
       })
     })
   })

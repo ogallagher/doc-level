@@ -71,6 +71,38 @@ export const SEARCH_T = 't'
  * Variable representing a tag pattern in a library search expression.
  */
 export const SEARCH_Q = 'q'
+/**
+ * Tagging expr statement delimiter.
+ */
+export const TAGS_STMT_DELIM = ';'
+/**
+ * Tagging expr operator for accessing an item within a collection of tags or stories.
+ */
+export const TAGS_ACCESS = '[]'
+/**
+ * Tagging expr unary operator to create a tag.
+ */
+export const TAGS_ADD = '+'
+/**
+ * Tagging expr unary operator to delete a tag.
+ */
+export const TAGS_DEL = '-'
+/**
+ * Tagging expr binary operator to add a connection.
+ */
+export const TAGS_CONN = '+='
+/**
+ * Tagging expr binary operator to delete a connection.
+ */
+export const TAGS_DISC = '-='
+/**
+ * Variable representing a tag in a tagging expression.
+ */
+export const TAGS_T = 't'
+/**
+ * Variable representing a story in a tagging expression.
+ */
+export const TAGS_S = 's'
 
 const OpenAIChatModel = {
   GPT_4: 'gpt-4o',
@@ -236,6 +268,14 @@ export const argParser = (
       + 'Not usually necessary unless files were changed manually.'
     ),
     default: false
+  })
+  .option('custom-tag', {
+    alias: 'T',
+    type: 'string',
+    description: (
+      `Create custom tags and connections. Syntax is a list of semicolon delimited statements, each `
+      + `being a tag operation. See documentation for supported operations.`
+    )
   })
   .option('stories-dir', {
     alias: 'd',

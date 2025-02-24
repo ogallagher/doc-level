@@ -5,6 +5,7 @@ import { getDateTag, getTextTag } from './library.js'
 
 
 export class StorySummary extends LibraryDescriptor {
+  static get tId() { return RelationalTag.new('story-id') }
   static get tAuthorName() { return  RelationalTag.new('author-name') }
   static get tTitle() { return RelationalTag.new('title') }
   static get tPublishDate() { return RelationalTag.new('publish-date') }
@@ -56,12 +57,17 @@ export class StorySummary extends LibraryDescriptor {
   }
 
   static initTags() {
+    this.adoptTag(this.tId)
     this.adoptTag(this.tAuthorName)
     this.adoptTag(this.tTitle)
     this.adoptTag(this.tPublishDate)
   }
 
   setTags() {
+    let tid = RelationalTag.get(this.id)
+    StorySummary.tId.connect_to(tid, TYPE_TO_TAG_CHILD)
+    tid.connect_to(this)
+
     let tan = getTextTag(this.authorName)
     StorySummary.tAuthorName.connect_to(tan, TYPE_TO_TAG_CHILD)
     tan.connect_to(this)
