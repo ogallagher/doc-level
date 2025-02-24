@@ -5,6 +5,7 @@
 import pino from 'pino'
 import path from 'path'
 import { init as configInit, argParser } from './config.js'
+import { init as progressInit } from './progress.js'
 import { init as readerInit } from './reader.js'
 import { init as textProfileInit } from './textProfile.js'
 import { init as messageSchemaInit } from './messageSchema.js'
@@ -91,6 +92,7 @@ logger.setLevel = function(level) {
  */
 function init() {
   return Promise.all([
+    progressInit(logger).then(addChildLogger),
     textProfileInit(logger).then(addChildLogger),
     messageSchemaInit(logger).then(addChildLogger),
     writerInit(logger).then(addChildLogger),

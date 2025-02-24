@@ -10,8 +10,10 @@ import { loadText, loadProfile, getProfilePath } from './reader.js'
 import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT, SEARCH_OP_NEQ, SEARCH_OP_NOT, TAGS_STMT_DELIM, TAGS_ADD, TAGS_DEL, TAGS_CONN, TAGS_DISC, TAGS_ACCESS, TAGS_T, TAGS_S } from './config.js'
 import { compileRegexp } from './stringUtil.js'
 import { LibrarySearchEntry } from './librarySearchEntry.js'
+import * as progress from './progress.js'
 /**
  * @typedef {import('pino').Logger} Logger
+ * @typedef {import('cli-progress').SingleBar} SingleBar
  * @typedef {Array<string|SearchExpression>} SearchExpression Multi term expression.
  * @typedef {import('relational_tags').RelationalTagConnection} RelationalTagConnection
  * @typedef {import('./librarySearchEntry.js').BookReference} BookReference
@@ -170,6 +172,10 @@ export async function getLibrary(indexPages, profilesDir) {
    */
   const library = new Library()
 
+  const pb = progress.start()
+  progress.log(pb, 'loading local library')
+  const pbPages = progress.addBar(pb, 'index pages', indexPages.length)
+
   for (let page of indexPages) {
     logger.debug('create LibraryBook instance for each story in page-path=%s', page.filePath)
     let pPage = loadText(page.filePath)
@@ -179,6 +185,8 @@ export async function getLibrary(indexPages, profilesDir) {
        * @param {StorySummary[]} storySummaries 
        */
       (storySummaries) => {
+        const pbStories = progress.addBar(pb, page.toString() + ' stories', storySummaries.length)
+
         return Promise.all(storySummaries.map(async (story) => {
           /**
            * @type {TextProfile|undefined}
@@ -192,20 +200,27 @@ export async function getLibrary(indexPages, profilesDir) {
             logger.trace(err)
           }
 
+          pbStories.increment()
           return {story: StorySummary.fromData(story), profile}
         }))
       }
     )
     .then((storyProfiles) => {
+      const pbBooks = progress.addBar(pb, page.toString() + ' books', storyProfiles.length)
       storyProfiles.forEach(({story, profile}) => {
         library.addBook(new LibraryBook(library, story, page, profile))
+        pbBooks.increment()
       })
+    })
+    .then(() => {
+      pbPages.increment()
     })
 
     pPages.push(pPage)
   }
 
   await Promise.all(pPages)
+  progress.stop(pb)
   return library
 }
 
