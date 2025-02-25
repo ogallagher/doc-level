@@ -168,7 +168,11 @@ export function downloadWebpage(url, localPath, skipIfFileExists=true, reqHeader
               })
             )
           },
-          rej
+          (err) => {
+            rej(new Error(`failed to fetch story from url=${url}`, {
+              cause: err
+            }))
+          }
         )
       }
       else {

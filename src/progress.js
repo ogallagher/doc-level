@@ -42,7 +42,7 @@ export function start() {
       forceRedraw: true,
       hideCursor: true,
       format: `{${PROG_BAR}} | {${PROG_NAME}} | {${PROG_VALUE}}/{${PROG_TOTAL}} | {${PROG_ETA}}s`,
-      barsize: 40,
+      barsize: 10,
       align: 'left'
     },
     Presets.rect

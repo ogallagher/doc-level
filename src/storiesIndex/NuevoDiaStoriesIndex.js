@@ -219,7 +219,7 @@ export class NuevoDiaStoriesIndex extends StoriesIndex {
     const titlesEl = storyPage.querySelector(NuevoDiaStoriesIndex.selectorArticleTitle)
     const headlinesEl = titlesEl?.querySelectorAll(NuevoDiaStoriesIndex.selectorTitleHeadlines)
     if (headlinesEl === undefined || headlinesEl.length < 1) {
-      NuevoDiaStoriesIndex.logger.warning(
+      NuevoDiaStoriesIndex.logger.warn(
         'unable to find headlines to include in story text at %s',
         NuevoDiaStoriesIndex.selectorTitleHeadlines
       )

@@ -5,6 +5,7 @@ import * as config from './config.js'
 import * as reader from './reader.js'
 import * as tp from './textProfile.js'
 import * as writer from './writer.js'
+import * as progress from './progress.js'
 import { getStoriesIndex } from './storiesIndex/index.js'
 import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { LOCAL_INDEX_NAME } from './storiesIndex/LocalStoriesIndex.js'
@@ -18,6 +19,8 @@ import { LibrarySearchEntry } from './librarySearchEntry.js'
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {import('./librarySearchEntry.js').BookReference} BookReference
+ * @typedef {import('cli-progress').MultiBar} MultiBar
+ * @typedef {import('cli-progress').SingleBar} SingleBar
  */
 
 /**
@@ -210,10 +213,11 @@ export async function resolveHistoryVar(historyOpt) {
  * @param {number} storiesMax 
  * @param {string} storiesDir 
  * @param {string|undefined} storyPrev
+ * @param {MultiBar} parentPB
  * 
  * @returns {Promise<Map<number, StorySummary[]>>} Paged story summaries.
  */
-async function fetchStorySummaries(index, startPage, startStory, storiesMax, storiesDir, storyPrev) {
+async function fetchStorySummaries(index, startPage, startStory, storiesMax, storiesDir, storyPrev, parentPB) {
   // @next in this context refers to last+1 instead of previous+1
   // Math.max returns -infinity if no local pages exist
   const lastPageNumber = Math.max(
@@ -238,7 +242,8 @@ async function fetchStorySummaries(index, startPage, startStory, storiesMax, sto
     pageNumber,
     storyArrayIndex,
     storiesMax, 
-    storiesDir
+    storiesDir,
+    parentPB
   )
   
   logger.info('fetched %s pages of stories from %s', pagedStories.size, index.name)
@@ -488,11 +493,10 @@ async function fetchStory(storiesDir, story, indexName, indexPage) {
   else {
     logger.info('local full text exists at "%s"; load from local instead of download', storyFullTextPath)
     storyText = await reader.loadText(storyFullTextPath)
-      .then((rawText) => rawText.split(/[\n\r]{2,}/))
+    .then((rawText) => rawText.split(/[\n\r]{2,}/))
 
     logger.info('loaded story=%s paragraph-count=%s from %s', story.id, storyText.length, storyFullTextPath)
   }
-
 
   return storyText
 }
@@ -543,15 +547,23 @@ async function reduceStory(storyText, storyLengthMax, excerptPath) {
  * @param {string} storyText 
  * @param {string} textPath 
  * @param {boolean} replaceIfExists
+ * @param {MultiBar|undefined} parentPB Progress context from parent.
  * @returns {Promise<reader.Context>}
  */
-async function createProfile(storyText, textPath, replaceIfExists) {
+async function createProfile(storyText, textPath, replaceIfExists, parentPB) {
   const ctx = new reader.Context(storyText, new tp.TextProfile(), textPath)
+  const profileSteps = ['maturity', 'difficulty', 'topics', 'ideologies', 'save']
+  const pbProfile = (
+    parentPB !== undefined 
+    ? progress.addBar(parentPB, `create profile ${path.basename(ctx.profile.filePath)}`, profileSteps.length) 
+    : undefined
+  )
 
   // check whether local profile file already exists
   if (!replaceIfExists && await writer.fileExists(ctx.profile.filePath)) {
     logger.info('load existing local profile from path="%s"', ctx.profile.filePath)
     ctx.profile = new tp.TextProfile(await reader.loadProfile(ctx.profile.filePath))
+    pbProfile?.update(profileSteps.length)
   }
   else {
     let storyPrelude = storyText.substring(0, 20)
@@ -561,41 +573,45 @@ async function createProfile(storyText, textPath, replaceIfExists) {
         logger.info('get maturity of %s...', storyPrelude)
 
         reader.getMaturity(ctx)
-          .then((maturity) => {
-            ctx.profile.setMaturity(maturity)
-            logger.info('profile.maturity=%o', ctx.profile.maturity)
-            res()
-          })
+        .then((maturity) => {
+          ctx.profile.setMaturity(maturity)
+          logger.info('profile.maturity=%o', ctx.profile.maturity)
+          pbProfile?.increment()
+          res()
+        })
       }),
       new Promise((res) => {
         logger.info('get difficulty of %s...', storyPrelude)
 
         reader.getDifficulty(ctx)
-          .then((difficulty) => {
-            ctx.profile.setDifficulty(difficulty)
-            logger.info('profile.difficulty=%o', ctx.profile.difficulty)
-            res()
-          })
+        .then((difficulty) => {
+          ctx.profile.setDifficulty(difficulty)
+          logger.info('profile.difficulty=%o', ctx.profile.difficulty)
+          pbProfile?.increment()
+          res()
+        })
       }),
       new Promise((res) => {
         logger.info('get topics in %s...', storyPrelude)
 
         reader.getTopics(ctx)
-          .then((topics) => {
-            ctx.profile.setTopics(topics)
-            logger.info('profile.topics=%o', ctx.profile.topics)
-            res()
-          })
+        .then((topics) => {
+          ctx.profile.setTopics(topics)
+          logger.info('profile.topics=%o', ctx.profile.topics)
+          pbProfile?.increment()
+          res()
+        })
       }),
       new Promise((res) => {
         logger.info('get ideologies in %s...', storyPrelude)
 
         reader.getIdeologies(ctx)
-          .then((ideologies) => {
-            ctx.profile.setIdeologies(ideologies)
-            logger.info('profile.ideologies=%o', ctx.profile.ideologies)
-            res()
-          })
+        .then((ideologies) => {
+          ctx.profile.setIdeologies(ideologies)
+          logger.info('profile.ideologies=%o', ctx.profile.ideologies)
+          pbProfile?.increment()
+          res()
+        })
       })
     ])
 
@@ -608,6 +624,7 @@ async function createProfile(storyText, textPath, replaceIfExists) {
       ctx.profile.filePath
     )
     logger.info('saved profile')
+    pbProfile?.increment()
   }
 
   return ctx
@@ -638,25 +655,43 @@ function saveCustomTags(tagsDir) {
  * @param {number|undefined} pagePrev Previous stories index page number.
  * @param {string|undefined} storyPrev Previous story id.
  * @param {boolean} cycle Whether loop execution, prompting for user input.
+ * @param {MultiBar|undefined} parentPB Caller progress bars context. Should only be defined if `!cycle`, in which case
+ * progress bars are not closed at the end of each cycle to enable user console input.
  * 
  * @returns {Promise<undefined|{
  *  fetchedPagedStories: Map<number, StorySummary[]>|undefined
  * }>} If looped, no return. Else, fetched stories.
  */
-export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
+export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=undefined) {
   // runtime args
   const args = await config.loadArgs(argSrc)
 
+  /**
+   * @type {MultiBar|undefined} Progress bars context, used for prolonged operations.
+   */
+  let pb
+
+  function consoleLog(message) {
+    if (parentPB === undefined) {
+      console.log(message)
+    }
+    else {
+      progress.log(parentPB, message)
+    }
+  }
+
   // register process.exit listeners
-  process.removeAllListeners('exit')
-  process.on('exit', () => {
-    saveCustomTags(args.tagsDir)
-  })
+  if (cycle) {
+    process.removeAllListeners('exit')
+    process.on('exit', () => {
+      saveCustomTags(args.tagsDir)
+    })
+  }
 
   if (args.help) {
     await config.argParser.getHelp()
       .then((prompt) => {
-        console.log(prompt + '\n')
+        consoleLog(prompt + '\n')
       })
   }
 
@@ -678,14 +713,21 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
    */
   let fetchedPagedStories
   if (args.fetchStoriesIndex !== undefined && !args.autopilot) {
+    pb = parentPB || progress.start()
+
     fetchedPagedStories = await fetchStorySummaries(
       getStoriesIndex(args.fetchStoriesIndex),
       args.page,
       args.story,
       args.fetchStoriesMax,
       args.storiesDir,
-      storyPrev
+      storyPrev,
+      pb
     )
+
+    if (pb !== parentPB) {
+      progress.stop(pb)
+    }
   }
   else {
     logger.debug('skip story summaries fetch')
@@ -790,7 +832,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     }
   }
 
-  // load and search library
+  // search library
   if (args.showLibrary !== undefined) {
     logger.info('show library in format=%s', args.showLibrary)
 
@@ -845,7 +887,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
 
         logger.info('write library search entry to %s', searchEntry.filePath)
         await writer.writeText(JSON.stringify(searchEntry, searchEntry.getSerializable, 2), searchEntry.filePath)
-        console.log(
+        consoleLog(
           `added entry with ${searchEntry.resultBookRefs.length} book references `
           + `to library search history at ${searchEntry.filePath}`
         )
@@ -856,7 +898,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     }
 
     renderFile.close()
-    console.log('view library at %s', renderPath)
+    consoleLog('view library at %s', renderPath)
   }
 
   // custom tagging
@@ -883,6 +925,10 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
    * @type {string|undefined}
    */
   let excerptPath
+  /**
+   * @type {SingleBar|undefined}
+   */
+  let pbProcessStory
 
   // fetch story
   await (
@@ -922,12 +968,12 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
 
         if (args.autopilot) {
           // start fetching from selected story with autopilot
-          console.log('launch autopilot')
+          consoleLog('launch autopilot')
           await autopilot(args, storyArrayIndex)
         }
         else {
           // fetch selected story
-          console.log(`select index=${args.index} page=${args.page} story=${args.story}`)
+          consoleLog(`select index=${args.index} page=${args.page} story=${args.story}`)
           logger.info('fetch index=%s page-%s=[%s] story=%s', args.index, args.page, indexPage.filePath, args.story)
 
           const _excerptPath = getExcerptPath(args.profilesDir, args.index, args.story, story.authorName, story.title)
@@ -936,7 +982,16 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
             excerptPath = _excerptPath
           }
           else {
-            storyText = await fetchStory(args.storiesDir, story, args.index, args.page)
+            try {
+              storyText = await fetchStory(args.storiesDir, story, args.index, args.page)
+            }
+            catch (err) {
+              logger.info('failed to fetch index %s story %s. %s', args.index, story, err)
+              
+              pb = parentPB || progress.start()
+              progress.addBar(pb, `failed to fetch index=${args.index} page=${args.page} story=${args.story}`, 0)
+              storySummary = undefined
+            }
           }
         }
       }
@@ -953,14 +1008,16 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
       }
     })()
   )
-  if (storySummary !== undefined) {
+  if (storySummary !== undefined && !args.autopilot) {
     logger.debug('fetched storySummary=%o', storySummary)
+    pb = parentPB || progress.start()
+    pbProcessStory = progress.addBar(pb, `process ${storySummary}`, ['reduce', 'profile'].length)
   }
 
   // use history books as input instead of single story
   if (historyBooks !== undefined) {
     if (args.autopilot) {
-      console.log('launch autopilot for %s history books', historyBooks.length)
+      consoleLog('launch autopilot for %s history books', historyBooks.length)
       await autopilot(args, undefined, historyBooks)
     }
     else {
@@ -984,6 +1041,8 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
     }
 
     storyText = await reduceStory(storyText, args.storyLengthMax, excerptPath)
+    // process-story.reduce
+    pbProcessStory.increment()
   }
   else {
     logger.debug('story undefined; skip reduce')
@@ -992,8 +1051,8 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
   // create story profile
   if (storyText !== undefined) {
     if (!args.skipProfile) {
-      const readerContext = await createProfile(storyText.join('\n'), excerptPath, args.forceProfile)
-      console.log(`story-${args.story} profile at ${readerContext.profile.filePath}`)
+      const readerContext = await createProfile(storyText.join('\n'), excerptPath, args.forceProfile, pb)
+      consoleLog(`story-${args.story} profile at ${readerContext.profile.filePath}`)
 
       if (library !== undefined) {
         logger.info('add book profile for story %o to library', storySummary)
@@ -1003,8 +1062,15 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true) {
       }
     }
     else {
-      console.log(`skip generate profile of story=${args.story} path="${excerptPath}"`)
+      consoleLog(`skip generate profile of story=${args.story} path="${excerptPath}"`)
     }
+
+    // process-story.profile
+    pbProcessStory.increment()
+  }
+
+  if (pb !== undefined && pb !== parentPB) {
+    progress.stop(pb)
   }
 
   // loop main

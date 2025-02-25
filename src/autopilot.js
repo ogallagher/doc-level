@@ -1,9 +1,6 @@
 import { StorySummary } from './storySummary.js'
-import { IndexPage } from './indexPage.js'
 import { main } from './main.js'
-import { listStoryIndexPages, loadStories } from './reader.js'
-import { LibraryBook } from './library.js'
-import { LibrarySearchEntry } from './librarySearchEntry.js'
+import * as progress from './progress.js'
 import { OPT_VAR_PREFIX } from './config.js'
 /**
  * @typedef {import('pino').Logger} Logger
@@ -77,6 +74,8 @@ export async function autopilot(args, storyArrayIndex, books=[]) {
    */
   const storyProcessors = []
 
+  const pb = progress.start()
+
   // derive list of book references from start story if list not provided
   if (storyArrayIndex !== undefined) {
     // fetch pages of story summaries
@@ -91,10 +90,11 @@ export async function autopilot(args, storyArrayIndex, books=[]) {
           '--page', args.page,
           '--story', `${OPT_VAR_PREFIX}${storyArrayIndex}` 
         ].concat(constArgs),
-        undefined, undefined, false
+        undefined, undefined, 
+        false, pb
       )
     ).fetchedPagedStories
-    console.log(`fetched pages of ${args.fetchStoriesMax} story summaries`)
+    progress.log(pb, `fetched pages of ${args.fetchStoriesMax} story summaries`)
 
     const firstPageNumber = Math.min(...pagedStories.keys())
     // skip stories before first requested
@@ -124,19 +124,27 @@ export async function autopilot(args, storyArrayIndex, books=[]) {
     books = books.slice(0, args.fetchStoriesMax)
   }
 
+  const pbBooks = progress.addBar(pb, 'process stories', books.length)
   for (let bookRef of books) {
-    storyProcessors.push(main(
-      [
-        '--index', bookRef.indexName, 
-        '--page', bookRef.pageNumber, 
-        '--story', bookRef.storyId
-      ].concat(constArgs),
-      undefined, undefined, false
-    ))
+    storyProcessors.push(
+      main(
+        [
+          '--index', bookRef.indexName, 
+          '--page', bookRef.pageNumber, 
+          '--story', bookRef.storyId
+        ].concat(constArgs),
+        undefined, undefined, 
+        false, pb
+      )
+      .then(() => {
+        pbBooks.increment()
+      })
+    )
   }
 
-  console.log(`queued ${storyProcessors.length} story processors`)
+  progress.log(pb, `queued ${storyProcessors.length} story processors`)
 
   await Promise.all(storyProcessors)
+  progress.stop(pb)
   console.log('end autopilot')
 }

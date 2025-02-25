@@ -25,11 +25,12 @@ import { downloadWebpage, fileExists, initDir, writeText } from './writer.js'
 import { IndexPage } from './indexPage.js'
 import { LibrarySearchEntry } from './librarySearchEntry.js'
 import { LibraryBook } from './library.js'
+import * as progress from './progress.js'
 
 /**
  * @typedef {import('pino').Logger} Logger
- * 
  * @typedef {import('openai').OpenAI} OpenAI
+ * @typedef {import('cli-progress').MultiBar} MultiBar
  */
 /**
  * @typedef {import('./messageSchema.js').MessageSchema} MessageSchema
@@ -229,16 +230,19 @@ export function loadPrompt(templatePath, ...args) {
  * @param {number} storiesMax Max count of stories to fetch. Note the actual count of stories returned
  * will be rounded up to nearest whole page.
  * @param {string} storiesParentDir
+ * @param {MultiBar} parentPB Caller progress bars context.
  * 
  * @returns {Promise<Map<number, StorySummary[]>>} Paged lists of stories, including pages that were
  * already in local filesystem.
  */
-export function fetchStories(storiesIndex, startPage, startStoryArrIdx, storiesMax, storiesParentDir) {
+export function fetchStories(storiesIndex, startPage, startStoryArrIdx, storiesMax, storiesParentDir, parentPB) {
   let pageNumber = startPage === undefined ? storiesIndex.pageNumberMin : startPage
   logger.info(
     'fetch up to %s stories from %s as of page %s story @%s and save to %s', 
     storiesMax, storiesIndex, pageNumber, startStoryArrIdx, storiesParentDir
   )
+  const pbStories = (parentPB !== undefined ? progress.addBar(parentPB, 'fetch stories', storiesMax) : undefined)
+
   let storiesCount = 0
   /**
    * @type {Map<number, StorySummary[]>}
@@ -340,7 +344,8 @@ export function fetchStories(storiesIndex, startPage, startStoryArrIdx, storiesM
       else {
         storiesCount += storySummaries.length
       }
-      
+      pbStories?.update(Math.min(storiesCount, pbStories?.getTotal()))
+
       pageNumber++
 
       // recursive call for next page
