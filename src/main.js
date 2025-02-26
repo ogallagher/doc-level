@@ -898,7 +898,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=und
     }
 
     renderFile.close()
-    consoleLog('view library at %s', renderPath)
+    consoleLog(`view library at ${renderPath}`)
   }
 
   // custom tagging

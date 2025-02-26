@@ -41,7 +41,7 @@ export function start() {
       stopOnComplete: false,
       forceRedraw: true,
       hideCursor: true,
-      format: `{${PROG_BAR}} | {${PROG_NAME}} | {${PROG_VALUE}}/{${PROG_TOTAL}} | {${PROG_ETA}}s`,
+      format: `{${PROG_BAR}} | {${PROG_NAME}} | {${PROG_VALUE}}/{${PROG_TOTAL}}`,
       barsize: 10,
       align: 'left'
     },

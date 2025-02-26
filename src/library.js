@@ -11,6 +11,7 @@ import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, 
 import { compileRegexp } from './stringUtil.js'
 import { LibrarySearchEntry } from './librarySearchEntry.js'
 import * as progress from './progress.js'
+import { collectionIterator, collectionSize } from './collectionUtil.js'
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {import('cli-progress').SingleBar} SingleBar
@@ -979,6 +980,9 @@ export class Library extends LibraryDescriptor {
   *getBooks(startTag, query, sort, excludeStartTag=false, excludeQuery=false) {
     /**
      * Matched tags and the graph path to each.
+     * 
+     * Type is converted from `Map` to `Array` if `sort` is applied.
+     * 
      * @type {Map<RelationalTag, RelationalTagConnection[]>|[RelationalTag, RelationalTagConnection[]][]}
      */
     let includeTags = new Map()
@@ -1067,7 +1071,7 @@ export class Library extends LibraryDescriptor {
     let resultBooks = new Set()
 
     // if no include tags defined, start with set of all books and remove results of excludeTags
-    let excludeWithoutInclude = (includeTags.size === 0 && excludeTags.size > 0)
+    let excludeWithoutInclude = (collectionSize(includeTags) === 0 && collectionSize(excludeTags) > 0)
     if (excludeWithoutInclude) {
       resultBooks = new Set(this.books.values())
     }
@@ -1075,12 +1079,16 @@ export class Library extends LibraryDescriptor {
 
     let t = 0
     for (
-      let [startTag, pathToStartTag] of (
-        excludeWithoutInclude ? excludeTags.entries() : (sort !== undefined ? includeTags : includeTags.entries())
+      let [startTag, pathToStartTag] of /** @type {[RelationalTag, RelationalTagConnection[]|RelationalTag][]} */ (
+        excludeWithoutInclude ? excludeTags.entries() : collectionIterator(includeTags)
       )
     ) {
       if (t < SEARCH_TAGS_MAX || excludeWithoutInclude) {
         /**
+         * Tagged entities associated to books.
+         * 
+         * Type is converted from `Map` to `Array` if `sort` is applied.
+         * 
          * @type {Map<LibraryDescriptor, RelationalTagConnection[]>|[LibraryDescriptor, RelationalTagConnection[]][]}
          */
         let descriptors = RelationalTag._search_descendants(
@@ -1115,9 +1123,8 @@ export class Library extends LibraryDescriptor {
 
         let b = 0
         for (
-          let [descriptor, pathToDescriptor] of (
-            (sort !== undefined && !excludeWithoutInclude) ? descriptors : descriptors.entries()
-          )
+          let [descriptor, pathToDescriptor] of
+          /** @type {[LibraryDescriptor, RelationalTagConnection[]][]} */ (collectionIterator(descriptors))
         ) {
           if (b < SEARCH_TAG_BOOKS_MAX || excludeWithoutInclude) {
             resultDescriptors.add(descriptor)
@@ -1133,7 +1140,7 @@ export class Library extends LibraryDescriptor {
               
                 yield [
                   book,
-                  pathToStartTag
+                  (Array.isArray(pathToStartTag) ? pathToStartTag : [])
                   .concat(
                     // remove initial recursive connection when linking to end first path
                     pathToDescriptor.filter((conn) => conn.source !== conn.target)
