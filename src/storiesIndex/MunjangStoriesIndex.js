@@ -30,7 +30,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
     'blockquote'
   ].join(',')
 
-  static excerptAuthorRegexp = /\s+([가-힣]{2,})\s+/
+  static excerptAuthorRegexp = /\s*([가-힣]{2,})\s+/
 
   constructor() {
     let url = new URL('https://munjang.or.kr/board.es')
@@ -90,7 +90,10 @@ export class MunjangStoriesIndex extends StoriesIndex {
             'title=%s does not contain author; get from start of excerpt after title'
           )
 
-          const titleEndIdx = excerpt.indexOf(title) + title.length
+          const titleStartIdx = excerpt.indexOf(title)
+          const titleEndIdx = (
+            titleStartIdx !== -1 ? titleStartIdx + title.length : 0
+          )
           const authorMatcher = MunjangStoriesIndex.excerptAuthorRegexp.exec(excerpt.substring(titleEndIdx))
           
           if (authorMatcher !== null) {
