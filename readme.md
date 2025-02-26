@@ -1387,7 +1387,7 @@ Each entry includes the result count, input options, and rendered result file pa
 
 Instead of specifying a start story and count, you can pass the result of a library search to `--autopilot` by combining with `-H <n>`, where `<n>` is the **search entry number** instead of a count.
 
-From the above example, `-a -H 21` would pass in **21** stories for autopilot to process.
+From the above example, `-a -H 29` would pass in **21** stories from search number 29 for autopilot to process.
 
 ## Custom tagging
 
