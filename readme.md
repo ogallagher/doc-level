@@ -1234,7 +1234,6 @@ Generates `data/renders/library_tags.txt`. Viewing this file we can see tags und
 ```txt
 ... / library-book / story / author-name / aaron abalone
 ... / library-book / story / author-name / ács, géza
-... / library-book / story / author-name / active
 ... / library-book / story / author-name / ambrus, zoltán
 ...
 ... / library-book / story / publish-date / 1970-01-01
@@ -1350,6 +1349,18 @@ Same result, using set intersection with negative condition.
 ```shell
 [opts]: -? "(t == 'publish-date' ^ q == '/2000-.+/') && (t != 'bailey buchemi')"
 ```
+
+### How library items are tagged
+
+When a story is added to the library, it is assigned to a `LibraryBook` instance. A book combines all the information we now about the story (ex. author, title, source url, stories index, index page, text profile). In object hierarchy, `story` is a child/member of `book`, and `profile` is another member of `book`.
+
+Tags also have a hierarchy, which mostly parallels the object hierarchy. There is a tag `story` that is child of tag `library-book`, and `text-profile` child of `library-book`. As mentioned under [view tags](#view-tags), you can use `-L tag` to view the full hierarchy.
+
+At implementation level, tags are almost never connected directly to books. Instead, they are connected to the book's `story`, or its `profile.maturity`. For example, tag `story.author-name.aaron abalone` will connect to object `book.story`, and tag `text-profile.topic.emotion-and-drama` will connect to object `book.profile.topics`. However, from a user perspective this generally doesn't matter, because these book members (of class `LibraryDescriptor`, called **descriptors**) still each belong to a single book, which is what the search will return.
+
+#### `library-book.text-profile.maturity`
+
+Unlike the other child tags of `text-profile`, `maturity` will only be (transitively) connected to a `book.story` descriptor if one of the supported maturity types (ex. `maturity.harassment`, `maturity.profanity`) is present in the profiled story text. Likewise, `maturity.restricted` is assigned if any of the maturity types are present. So `maturity` and `maturity.restricted` are basically redundant.
 
 ## Search history
 
