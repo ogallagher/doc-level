@@ -570,14 +570,28 @@ export class Library extends LibraryDescriptor {
   /**
    * Create unique id for the given book.
    * 
-   * Current implementation includes the index name and page number, so if the same story id is present
-   * on multiple pages, for example, they will are added as separate books.
+   * Current implementation includes the index name and story id, so if the same story id is present
+   * in multiple stories indexes, they will are added as separate books.
    * 
-   * @param {LibraryBook} book 
+   * @param {LibraryBook|string} book 
+   * @param {string} storyId
    * @returns {string}
    */
-  static _getKey(book) {
-    return [book.index.name, book.indexPage.pageNumber, book.story.id].join('-')
+  static _getKey(bookOrIndexName, storyId) {
+    /**
+     * @type {string[]}
+     */
+    let keyParts
+    if (bookOrIndexName instanceof LibraryBook) {
+      // is book
+      keyParts = [bookOrIndexName.index.name, bookOrIndexName.story.id]
+    }
+    else {
+      // is index + story
+      keyParts = [bookOrIndexName, storyId]
+    }
+
+    return keyParts.join('-')
   }
 
   /**
@@ -1176,30 +1190,21 @@ export class Library extends LibraryDescriptor {
   /**
    * Get a book by index name and story id. 
    * 
-   * Implemented using tag search, but performance could be improved by updating `Library._getKey` to exclude
-   * page number from a book's unique key.
-   * 
    * @param {string} indexName 
    * @param {string} storyId 
    * 
    * @returns {LibraryBook}
    */
   getBook(indexName, storyId) {
-    const resBooks = [
-      ...this.execSearchExpression([
-        `t == '${StorySummary.tId.name}' ^ q == '${storyId}'`,
-        `t == '${StoriesIndex.tName.name}' ^ q == '${indexName}'`
-      ].join(' && '))
-    ]
-    if (resBooks.length !== 1) {
-      throw new Error(`failed to get single book for index-name=${indexName} story-id=${storyId}`, {
+    const book = this.books.get(Library._getKey(indexName, storyId))
+    if (book === undefined) {
+      throw new Error(`failed to get book for index-name=${indexName} story-id=${storyId}`, {
         cause: {
           resultBooks: resBooks
         }
       })
     }
-
-    return resBooks[0][0]
+    return book
   }
 
   static initTags() {
