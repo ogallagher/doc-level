@@ -377,7 +377,10 @@ export function loadArgs(argSrc=hideBin(process.argv)) {
         logger.debug('converted raw query %s to regexp %s', argv.query, query_regexp)
         argv.query = query_regexp
       }
-      // else, leave as string
+      else {
+        // technically, this should be redundant if relational_tags is case insensitive
+        argv.query = argv.query.toLowerCase()
+      }
     }
   
     logger.info('loaded runtime args')

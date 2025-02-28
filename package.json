@@ -36,7 +36,7 @@
     "openai": "^4.80.1",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
-    "relational_tags": "^0.4.1",
+    "relational_tags": "^0.4.2",
     "sanitize-filename": "^1.6.3",
     "subscript": "^9.1.0",
     "uuid": "^11.0.5",

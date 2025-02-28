@@ -25,12 +25,13 @@ export function regexpEscape(str) {
  * Convert regexp string literal to RegExp instance.
  * 
  * @param {string} str 
+ * @param {boolean} ignoreCase Whether expression is case insensitive. Default `true`.
  * 
  * @returns {RegExp|undefined}
  */
-export function compileRegexp(str) {
+export function compileRegexp(str, ignoreCase=true) {
   if (str.startsWith('/') && str.endsWith('/')) {
-    return new RegExp(str.substring(1, str.length-1))
+    return new RegExp(str.substring(1, str.length-1), ignoreCase ? 'i' : undefined)
   }
 }
 
