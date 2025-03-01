@@ -1439,13 +1439,13 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 
 | option keys | description | requires |
 | --- | --- | --- |
-| `-f, --fetch-stories-index` | Fetch stories from a registered index/listing website. | |
+| `-f, --fetch-stories-index` | Fetch stories from a registered index/listing website. Default is dynamic. | |
 | `-F, --local-story-file` | Load an isolated story from a local full text file path. Use this if you already have a local text file to analyze. During load, `doc-level` will prompt for basic metadata in order to tag the story in the library. These stories will be assigned to a special stories index called `local`. | |
-| `-m, --fetch-stories-max` | Max number of stories to fetch. | `-f` |
+| `-m, --fetch-stories-max` | Max number of stories to fetch. Default is dynamic. | `-f` |
 | `-s, --story` | Identifier of a story to be loaded and profiled. If combined with `-f` or `-a`, defines the story from which to begin. | |
-| `-i, --index` | Stories index/listing name. | `-s` |
+| `-i, --index` | Stories index/listing name. Default is dynamic. | `-s` |
 | `-p, --page` | Page number within stories index. If combined with `-f`, provides page from which to start fetch. | `-s` or `-f` |
-| `-n, --story-length-max` | Max character length of story text to include when generating its profile. | `-s` |
+| `-n, --story-length-max` | Max character length of story text to include when generating its profile. Default is dynamic. | `-s` |
 | `-P, --force-profile` | Even if a profile for the selected story exists, generate a new one to replace it. | `-s` |
 | `-0, --skip-profile` | Even if a story is selected, do not generate a profile for it. | `-s` |
 | `-a, --autopilot` | Continue to cycle through stories and pages without pausing for input until `-m` is reached. Combine with `-i`, `-p`, `-s` opts to specify from which story to begin. | `-s` or `-H` |
@@ -1456,11 +1456,15 @@ If none of `-F`, `-s`, or `-L` are provided, then the previously fetched story i
 | `->, --sort` | Sort direction of search results. Ex. `-t years-of-education -> asc` will sort easiest texts first, and `-> desc` hardest first. | `-L` |
 | `-H, --show-history` | Load and show `<n>` (value optional) latest entries from library search history. Combine with `--autopilot` to profile the results from entry number `<n>`, higher is newer. |
 | `-T, --custom-tag` | Create custom tags and connections. Syntax is a list of semicolon delimited statements, each being a tag operation. See [Usage > Custom tagging](#custom-tagging) for supported operations. | |
-| `-d, --stories-dir` | Local filesystem directory where story lists and texts are saved. | |
-| `-D, --profiles-dir` | Local directory where story profiles are saved. | |
-| `-e, --renders-dir` | Local directory where library renderings/exports are saved. | |
+| `-d, --stories-dir` | Local filesystem directory where story lists and texts are saved. Default is dynamic. | |
+| `-D, --profiles-dir` | Local directory where story profiles are saved. Default is dynamic. | |
+| `-e, --renders-dir` | Local directory where library renderings/exports are saved. Default is dynamic. | |
+| `--history-dir` | Local directory where activity history (ex. library searches) is saved. Default is dynamic. | |
+| `--tags-dir` | Local directory where user defined custom tags are saved. Default is dynamic. | |
 | `-r, --reload` | Whether to reload library objects from the filesystem. Not usually necessary unless files were changed manually. | `-L` |
 | `-v, --version` | Show app version. | |
+
+**"Default is dynamic."** This means that the default value will update to whatever you last provided. These defaults are persisted in the same `.env` file where the `OPENAI_API_KEY` credential is defined.
 
 For `--story`, instead of providing a story id, you can also use variable expressions `@first` for the first story in the page, `@next` for the next story in the page, or `@<array-index>` for the story at a given index within the page stories array. `@first` and `@0` are equivalent.
 
