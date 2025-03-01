@@ -137,7 +137,8 @@ export class Context {
  * @param {string} instructions 
  * @param {string} request 
  * @param {MessageSchema} responseFormat 
- * @returns {Promise<*>}
+ * 
+ * @returns {Promise<*>} Structured response from lang model API matching the given message schema.
  */
 function getChatResponse(instructions, request, responseFormat) {
   return new Promise(function(res, rej) {
@@ -184,6 +185,47 @@ function getChatResponse(instructions, request, responseFormat) {
       }
     )
   })
+}
+
+/**
+ * @param {string} request 
+ * 
+ * @returns {Promise<Maturity>}
+ */
+async function getModerationResponse(request) {
+  logger.debug('call _ai.moderations')
+  
+  try {
+    /**
+     * @type {{
+     *  results: {
+     *    flagged: boolean
+     *    categories: {[category:string]: boolean}
+     *  }[]
+     * }}
+     */
+    const moderation = await _ai.moderations.create({
+      model: _maturityModel,
+      store: false,
+      input: request
+    })
+
+    const result = moderation.results[0]
+    
+    let presents = [], absents = []
+    Object.entries(result.categories).map(([category, isPresent]) => {
+      (isPresent ? presents : absents).push(category)
+    })
+
+    return new Maturity(
+      result.flagged,
+      presents,
+      absents
+    )
+  }
+  catch (err) {
+    throw filterAIError(err)
+  }
 }
 
 /**
@@ -459,32 +501,7 @@ export function reduceStory(paragraphs, lengthMax) {
 export function getMaturity(ctx) {  
   return Promise.all([
     // moderations
-    new Promise(function(res, rej) {
-      logger.debug('call _ai.moderations')
-      _ai.moderations.create({
-        model: _maturityModel,
-        store: false,
-        input: ctx.text
-      })
-      .then(
-        (moderation) => {
-          const result = moderation.results[0]
-
-          let presents = [], absents = []
-          Object.entries(result.categories).map(([category, isPresent]) => {
-            (isPresent ? presents : absents).push(category)
-          })
-          res(new Maturity(
-            result.flagged,
-            presents,
-            absents
-          ))
-        },
-        (err) => {
-          rej(filterAIError(err))
-        }
-      )
-    }),
+    getModerationResponse(ctx.text),
     // custom
     loadPrompt(PROMPT_CUSTOM_MATURITY_FILE, MATURITY_TYPE_PROFANE)
     .then(
@@ -526,6 +543,7 @@ export function getMaturity(ctx) {
       }
     )
   ])
+  // combine
   .then(
     ([m1, m2]) => {
       logger.info('maturity-moderations=%o', m1)
