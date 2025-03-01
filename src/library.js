@@ -8,7 +8,7 @@ import { StorySummary } from './storySummary.js'
 import { IndexPage } from './indexPage.js'
 import { loadText, loadProfile, getProfilePath } from './reader.js'
 import { SEARCH_TAGS_MAX, SEARCH_TAG_BOOKS_MAX, SEARCH_OP_AND, SEARCH_OP_GROUP, SEARCH_OP_OR, SEARCH_OP_COMPOSE, SEARCH_OP_EQ, SEARCH_T, SEARCH_Q, TYPE_TO_TAG_CHILD, TYPE_TO_TAG_PARENT, SEARCH_OP_NEQ, SEARCH_OP_NOT, TAGS_STMT_DELIM, TAGS_ADD, TAGS_DEL, TAGS_CONN, TAGS_DISC, TAGS_ACCESS, TAGS_T, TAGS_S } from './config.js'
-import { compileRegexp } from './stringUtil.js'
+import { compileRegexp, formatRegexp } from './stringUtil.js'
 import { LibrarySearchEntry } from './librarySearchEntry.js'
 import * as progress from './progress.js'
 import { collectionIterator, collectionSize } from './collectionUtil.js'
@@ -366,7 +366,7 @@ export function *exportLibrary(library, format, startTagName, query, searchExpr,
     if (format === 'txt') {
       logger.info('render library as a list books')
   
-      yield `=== books in library for start-tag=${startTagName} query=${query} search-expr="${searchExpr}" sort=${sort}\n\n`
+      yield `=== books in library for start-tag=${startTagName} query=${formatRegexp(query)} search-expr="${searchExpr}" sort=${sort}\n\n`
       for (
         let next = bookGen.next(); 
         !next.done && ([book, bookSearchPath] = next.value);
@@ -391,7 +391,7 @@ export function *exportLibrary(library, format, startTagName, query, searchExpr,
 
       // save input
       yield `## input\n\n`
-      yield `\`--show-library ${format} --tag ${startTagName} --query ${query} --search-expr="${searchExpr}" --sort ${sort}\`\n`
+      yield `\`--show-library ${format} --tag ${startTagName} --query ${formatRegexp(query)} --search-expr="${searchExpr}" --sort ${sort}\`\n`
       yield '\n'
 
       yield `## output\n\n`
@@ -614,11 +614,12 @@ export class Library extends LibraryDescriptor {
   }
 
   /**
-   * @param {LibraryBook} book 
+   * @param {LibraryBook|string} bookOrIndexName 
+   * @param {string|undefined} storyId
    * @returns {boolean} Whether this book is in the library.
    */
-  has(book) {
-    return this.books.has(Library._getKey(book))
+  has(bookOrIndexName, storyId) {
+    return this.books.has(Library._getKey(bookOrIndexName, storyId))
   }
 
   /**

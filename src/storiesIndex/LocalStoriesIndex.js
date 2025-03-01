@@ -11,7 +11,8 @@ export class LocalStoriesIndex extends StoriesIndex {
       'index.json',
       undefined,
       undefined,
-      true)
+      true
+    )
   }
 
   getPageUrl() {

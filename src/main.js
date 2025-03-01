@@ -10,7 +10,7 @@ import { getStoriesIndex } from './storiesIndex/index.js'
 import { StoriesIndex } from './storiesIndex/storiesIndex.js'
 import { LOCAL_INDEX_NAME } from './storiesIndex/LocalStoriesIndex.js'
 import { StorySummary } from './storySummary.js'
-import { fileString } from './stringUtil.js'
+import { fileString, formatRegexp } from './stringUtil.js'
 import { IndexPage } from './indexPage.js'
 import { flushCliLogStream } from './pinoCliLogTransport.js'
 import { autopilot } from './autopilot.js'
@@ -212,12 +212,20 @@ export async function resolveHistoryVar(historyOpt) {
  * @param {string|undefined} startStory
  * @param {number} storiesMax 
  * @param {string} storiesDir 
+ * @param {lib.Library|undefined} indexLibrary 
  * @param {string|undefined} storyPrev
  * @param {MultiBar} parentPB
  * 
  * @returns {Promise<Map<number, StorySummary[]>>} Paged story summaries.
  */
-async function fetchStorySummaries(index, startPage, startStory, storiesMax, storiesDir, storyPrev, parentPB) {
+async function fetchStorySummaries(
+  index, startPage, startStory, 
+  storiesMax, 
+  storiesDir, 
+  indexLibrary,
+  storyPrev, 
+  parentPB
+) {
   // @next in this context refers to last+1 instead of previous+1
   // Math.max returns -infinity if no local pages exist
   const lastPageNumber = Math.max(
@@ -243,6 +251,7 @@ async function fetchStorySummaries(index, startPage, startStory, storiesMax, sto
     storyArrayIndex,
     storiesMax, 
     storiesDir,
+    indexLibrary,
     parentPB
   )
   
@@ -647,6 +656,45 @@ function saveCustomTags(tagsDir) {
 }
 
 /**
+ * Load library and custom tags from filesystem.
+ * 
+ * @param {Map<string, Map<number, IndexPage>>|undefined} indexPages
+ * @param {string} storiesDir
+ * @param {string} profilesDir 
+ * @param {string} tagsDir 
+ * 
+ * @returns {Promise<lib.Library>}
+ */
+async function loadLibrary(indexPages, storiesDir, profilesDir, tagsDir) {
+  logger.info('load library from filesystem')
+
+  if (indexPages === undefined) {
+    indexPages = await reader.listStoryIndexPages(storiesDir)
+  }
+
+  const library = await lib.getLibrary(
+    // for each index
+    [...indexPages.values()]
+      .map((pages) => {
+        // for each page number, return page objects
+        return [...pages.values()]
+      })
+      .flat(),
+    profilesDir
+  )
+
+  const tagsPath = path.join(tagsDir, `${lib.Library.tCustom.name}.json`)
+  if (await writer.fileExists(tagsPath)) {
+    await reader.loadText(tagsPath)
+    .then((tagsJson) => {
+      lib.loadCustomTags(library, tagsJson)
+    })
+  }
+
+  return library
+}
+
+/**
  * Looping program execution. End of each lap pauses for next set of arguments before
  * passing as input to the next.
  * 
@@ -715,12 +763,38 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=und
   if (args.fetchStoriesIndex !== undefined && !args.autopilot) {
     pb = parentPB || progress.start()
 
+    const index = getStoriesIndex(args.fetchStoriesIndex)
+    /**
+     * Library of books subset belonging to the index from which to fetch, if necessary.
+     * 
+     * @type {lib.Library|undefined}
+     */
+    let indexLibrary
+    if (index.isPageDynamic) {
+      logger.info('%s has dynamic pages; load local stories before fetch to skip duplicates', index)
+      indexLibrary = library
+
+      if (args.reload || indexLibrary === undefined) {
+        /**
+         * Pages within the stories index from which to fetch.
+         */
+        const indexPages = await reader.listStoryIndexPages(args.storiesDir, index.name)
+        indexLibrary = await loadLibrary(
+          indexPages, 
+          args.storiesDir, 
+          args.profilesDir, 
+          args.tagsDir
+        )
+      }
+    }
+
     fetchedPagedStories = await fetchStorySummaries(
-      getStoriesIndex(args.fetchStoriesIndex),
+      index,
       args.page,
       args.story,
       args.fetchStoriesMax,
       args.storiesDir,
+      indexLibrary,
       storyPrev,
       pb
     )
@@ -750,7 +824,10 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=und
     && args.customTag === undefined
     && !args.help
   ) {
-    indexPages = await reader.listStoryIndexPages(args.storiesDir)
+    if (indexPages === undefined) {
+      indexPages = await reader.listStoryIndexPages(args.storiesDir)
+    }
+    
     await showAvailableStories(indexPages)
   }
 
@@ -802,30 +879,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=und
   // load library and custom tags
   if (args.showLibrary !== undefined || args.customTag !== undefined) {
     if (args.reload || library === undefined) {
-      logger.info('load library from filesystem')
-
-      if (indexPages === undefined) {
-        indexPages = await reader.listStoryIndexPages(args.storiesDir)
-      }
-
-      library = await lib.getLibrary(
-        // for each index
-        [...indexPages.values()]
-          .map((pages) => {
-            // for each page number, return page objects
-            return [...pages.values()]
-          })
-          .flat(),
-        args.profilesDir
-      )
-
-      const tagsPath = path.join(args.tagsDir, `${lib.Library.tCustom.name}.json`)
-      if (await writer.fileExists(tagsPath)) {
-        await reader.loadText(tagsPath)
-        .then((tagsJson) => {
-          lib.loadCustomTags(library, tagsJson)
-        })
-      }
+      library = await loadLibrary(indexPages, args.storiesDir, args.profilesDir, args.tagsDir)
     }
     else {
       logger.info('use existing library from memory')
@@ -841,7 +895,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=und
     let renderFilename = fileString(
       'library'
       + (args.tag !== undefined ? `_t=${args.tag}` : '')
-      + (args.query !== undefined ? `_q=${args.query}` : '')
+      + (args.query !== undefined ? `_q=${formatRegexp(args.query)}` : '')
       + (args.searchExpr !== undefined ? `_search-expr=${
           args.searchExpr.replaceAll(config.SEARCH_OP_EQ, '').replaceAll("'", '')
         }` : '')
@@ -875,7 +929,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=und
           lastSearchEntry !== undefined ? lastSearchEntry[0] + 1 : 0,
           [].concat(
             (args.tag !== undefined ? ['-t', `"${args.tag}"`] : []),
-            (args.query !== undefined ? ['-q', `"${args.query}"`] : []),
+            (args.query !== undefined ? ['-q', `"${formatRegexp(args.query)}"`] : []),
             (args.searchExpr !== undefined ? ['-?', `"${args.searchExpr}"`]: []),
             (args.sort !== undefined ? ['->', args.sort] : []),
             ['-L', args.showLibrary]

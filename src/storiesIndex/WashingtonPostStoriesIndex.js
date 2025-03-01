@@ -14,8 +14,9 @@ export class WashingtonPostStoriesIndex extends StoriesIndex {
 
   /**
    * @param {string} basePath
+   * @param {number} pageArticleCount 
    */
-  constructor(basePath) {
+  constructor(basePath, pageArticleCount = 50) {
     let url = new URL('https://www.washingtonpost.com/prism/api/prism-query')
     url.searchParams.set('_website', 'washpost')
 
@@ -24,14 +25,19 @@ export class WashingtonPostStoriesIndex extends StoriesIndex {
       ['washington-post', 'washpost'],
       0,
       300,
-      'index-prism-api.json'
+      'index-prism-api.json',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      pageArticleCount
     )
 
     /**
      * Count of articles per page. Multiply page number by this to get offset.
      * @type {number}
      */
-    this.pageArticleCount = 50
+    this.pageArticleCount = pageArticleCount
 
     /**
      * @type {{

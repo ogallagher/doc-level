@@ -4,6 +4,7 @@ import { LibraryDescriptor } from '../libraryDescriptor.js'
 import { IndexPage } from '../indexPage.js'
 /**
  * @typedef {import('pino').Logger} Logger
+ * @typedef {import('../storySummary.js').StorySummary} StorySummary
  */
 
 /**
@@ -41,6 +42,7 @@ export class StoriesIndex extends LibraryDescriptor {
    * @param {string} pageFilename
    * @param {any} pageRequestHeaders
    * @param {boolean} hide
+   * @param {boolean} isPageDynamic
    */
   constructor(
     urlTemplate, names, 
@@ -48,7 +50,9 @@ export class StoriesIndex extends LibraryDescriptor {
     pageFilename = 'index.html',
     pageRequestHeaders = undefined,
     storyFileExt = '.html',
-    hide = false
+    hide = false,
+    isPageDynamic = false,
+    pageStoryCountExpected = 25
   ) {
     super()
     
@@ -85,6 +89,16 @@ export class StoriesIndex extends LibraryDescriptor {
      * @type {boolean}
      */
     this.hide = hide
+    /**
+     * Whether the same page number can return different sets of stories depending on when the fetch
+     * is performed.
+     * @type {boolean}
+     */
+    this.isPageDynamic = isPageDynamic
+    /**
+     * Expected number of stories in a single page.
+     */
+    this.pageStoryCountExpected = pageStoryCountExpected
 
     // define tags early so that aliases are also defined
     this.setTags()
@@ -138,7 +152,7 @@ export class StoriesIndex extends LibraryDescriptor {
   /**
    * Parse a list of story summaries from the stories index page content.
    * 
-   * @param {any} indexPage Parsed page (ex. `HTMLElement` from html page, or `object` from json page).
+   * @param {HTMLElement|object} indexPage Parsed page.
    * @returns {Generator<StorySummary>}
    */
   *getStorySummaries(indexPage) {

@@ -1356,6 +1356,8 @@ When a story is added to the library, it is assigned to a `LibraryBook` instance
 
 Tags also have a hierarchy, which mostly parallels the object hierarchy. There is a tag `story` that is child of tag `library-book`, and `text-profile` child of `library-book`. As mentioned under [view tags](#view-tags), you can use `-L tag` to view the full hierarchy.
 
+Raw values (ex. story title, author) may be transformed before being used as a tag. **Tags are lowercase, and searches ignore letter case**.
+
 At implementation level, tags are almost never connected directly to books. Instead, they are connected to the book's `story`, or its `profile.maturity`. For example, tag `story.author-name.aaron abalone` will connect to object `book.story`, and tag `text-profile.topic.emotion-and-drama` will connect to object `book.profile.topics`. However, from a user perspective this generally doesn't matter, because these book members (of class `LibraryDescriptor`, called **descriptors**) still each belong to a single book, which is what the search will return.
 
 #### `library-book.text-profile.maturity`

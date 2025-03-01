@@ -35,6 +35,28 @@ export function compileRegexp(str, ignoreCase=true) {
   }
 }
 
+/**
+ * Format given regular expression as a string.
+ * 
+ * @param {RegExp|string} regexp 
+ * @param {boolean} omitFlags Whether to omit regexp flags. Default `true`.
+ */
+export function formatRegexp(regexp, omitFlags=true) {
+  if (regexp instanceof RegExp) {
+    let str = regexp.toString()
+
+    if (omitFlags) {
+      return str.substring(0, str.indexOf('/', 1) + 1)
+    }
+    else {
+      return str
+    }
+  }
+  else {
+    return regexp
+  }
+}
+
 export function fileString(str) {
   return sanitizeFilename(str)
   .replace(/\s+/g, '-')

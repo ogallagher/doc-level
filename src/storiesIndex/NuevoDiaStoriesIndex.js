@@ -65,7 +65,11 @@ export class NuevoDiaStoriesIndex extends StoriesIndex {
       `${apiEndpoint}.json`,
       {
         'referer': refererUrl.toString()
-      }
+      },
+      undefined,
+      undefined,
+      undefined,
+      pageArticleCount
     )
 
     /**
