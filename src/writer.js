@@ -44,7 +44,7 @@ export function init(parentLogger) {
  * @param {string} text 
  * @param {string|FileHandle} path Path to file, or a writable file handle (ex. output of `openFile`). If
  * file handle, this method assumes the caller will close the file handle on completion.
- * @param {boolean} sync Whether to perform write synchronously.
+ * @param {boolean} sync Whether to perform write synchronously. Default `false`.
  * @returns {Promise<undefined>|undefined}
  */
 export function writeText(text, path, sync=false) {

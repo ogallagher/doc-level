@@ -9,14 +9,28 @@ import path from 'path'
 import { hideBin } from 'yargs/helpers'
 import { compileRegexp } from './stringUtil.js'
 import { RelationalTagConnection } from 'relational_tags'
+import { writeText } from './writer.js'
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {import('./storiesIndex/storiesIndex.js').StoriesIndex} StoriesIndex
  */
 
+/**
+ * Path to environment vars file.
+ */
+const ENV_PATH = '.env'
+
 const ENV_KEY_OPENAI_API_KEY = 'OPENAI_API_KEY' 
 const ENV_KEY_READING_DIFFICULTY_WORDS_MAX = 'READING_DIFFICULTY_WORDS_MAX'
 const ENV_KEY_READING_DIFFICULTY_PHRASES_MAX = 'READING_DIFFICULTY_PHRASES_MAX'
+/**
+ * All recognized environment variables.
+ */
+const ENV_KEYS = new Set([
+  ENV_KEY_OPENAI_API_KEY,
+  ENV_KEY_READING_DIFFICULTY_WORDS_MAX,
+  ENV_KEY_READING_DIFFICULTY_PHRASES_MAX
+])
 
 export const SEARCHES_DIR = 'searches'
 
@@ -389,6 +403,31 @@ export function loadArgs(argSrc=hideBin(process.argv)) {
 }
 
 /**
+ * Get an env variable value, and persist the value back to `process.env`.
+ * 
+ * @param {string} envKey 
+ * @param {T} defaultValue 
+ * @param {function(string): T} typeCast 
+ * 
+ * @returns Value typed according to `typeCast`.
+ */
+function envGet(envKey, defaultValue, typeCast) {
+  let value = process.env[envKey]
+  if (value === undefined) {
+    value = defaultValue
+  }
+
+  process.env[envKey] = value
+
+  if (typeCast === undefined) {
+    return value
+  }
+  else {
+    return typeCast(value)
+  }
+}
+
+/**
  * Load env vars and AI API clients.
  * 
  * @returns {Promise<{
@@ -402,12 +441,14 @@ export function loadArgs(argSrc=hideBin(process.argv)) {
 function loadEnv() {
   return new Promise((res) => {
     logger.debug('load env vars from .env')
-    dotenv.config()
+    dotenv.config({
+      path: ENV_PATH
+    })
   
     // confirm env vars loaded
     const openaiApiKey = process.env[ENV_KEY_OPENAI_API_KEY]
-    const readingDifficultyWordsMax = process.env[ENV_KEY_READING_DIFFICULTY_WORDS_MAX] || READING_DIFFICULTY_WORDS_MAX
-    const readingDifficultyPhrasesMax = process.env[ENV_KEY_READING_DIFFICULTY_PHRASES_MAX] || READING_DIFFICULTY_PHRASES_MAX
+    const readingDifficultyWordsMax = envGet(ENV_KEY_READING_DIFFICULTY_WORDS_MAX, READING_DIFFICULTY_WORDS_MAX, parseInt)
+    const readingDifficultyPhrasesMax = envGet(ENV_KEY_READING_DIFFICULTY_PHRASES_MAX, READING_DIFFICULTY_PHRASES_MAX, parseInt)
     if (openaiApiKey == undefined) {
       throw new Error(`missing env var ${ENV_KEY_OPENAI_API_KEY}`)
     }
@@ -428,6 +469,22 @@ function loadEnv() {
       })
     }
   })
+}
+
+/**
+ * Save `process.env` to {@linkcode ENV_PATH}.
+ * 
+ * @returns {undefined}
+ */
+export function saveEnv() {
+  logger.info('save process.env to %s', ENV_PATH)
+  writeText(
+    Object.entries(process.env)
+    .filter(([key]) => ENV_KEYS.has(key))
+    .map(([key, val]) => `${key}="${val}"`).join('\n'),
+    ENV_PATH,
+    true
+  )
 }
 
 /**

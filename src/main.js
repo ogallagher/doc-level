@@ -733,6 +733,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=und
     process.removeAllListeners('exit')
     process.on('exit', () => {
       saveCustomTags(args.tagsDir)
+      config.saveEnv()
     })
   }
 
