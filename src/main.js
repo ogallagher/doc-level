@@ -714,6 +714,14 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=und
   // runtime args
   const args = await config.loadArgs(argSrc)
 
+  // handle simple custom defaults
+  if (args.index === '') {
+    args.index = config.getDefaultIndexName()
+  }
+  if (args.fetchStoriesIndex === '') {
+    args.fetchStoriesIndex = config.getDefaultIndexName()
+  }
+
   /**
    * @type {MultiBar|undefined} Progress bars context, used for prolonged operations.
    */
@@ -990,7 +998,7 @@ export async function main(argSrc, pagePrev, storyPrev, cycle=true, parentPB=und
     (async () => {
       if (args.story !== undefined && args.fetchStoriesIndex === undefined) {
         // resolve index alias
-        args.index = getStoriesIndex(args.index).name
+        args.index = getStoriesIndex(args.index || config.getDefaultIndexName()).name
 
         // resolve page variable
         let pageNumber = await resolvePageVar(args.page, pagePrev, args.index)

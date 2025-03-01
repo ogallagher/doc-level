@@ -291,7 +291,7 @@ export function fetchStories(storiesIndex, startPage, startStoryArrIdx, storiesM
     'fetch up to %s stories from %s as of page %s story @%s and save to %s', 
     storiesMax, storiesIndex, localPageNumber, startStoryArrIdx, storiesParentDir
   )
-  const pbStories = (parentPB !== undefined ? progress.addBar(parentPB, 'fetch stories', storiesMax) : undefined)
+  const pbStories = (parentPB !== undefined ? progress.addBar(parentPB, `fetch stories from ${storiesIndex.name}`, storiesMax) : undefined)
 
   let storiesCount = 0
   /**

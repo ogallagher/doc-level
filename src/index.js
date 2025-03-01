@@ -4,13 +4,13 @@
 
 import pino from 'pino'
 import path from 'path'
-import { init as configInit, argParser } from './config.js'
+import { init as configInit } from './config.js'
 import { init as progressInit } from './progress.js'
 import { init as readerInit } from './reader.js'
 import { init as textProfileInit } from './textProfile.js'
 import { init as messageSchemaInit } from './messageSchema.js'
 import { init as writerInit } from './writer.js'
-import { init as storiesIndexInit, getStoryIndexNames } from './storiesIndex/index.js'
+import { init as storiesIndexInit } from './storiesIndex/index.js'
 import { init as libraryInit } from './library.js'
 import { init as mainInit, main } from './main.js'
 import { init as autopilotInit } from './autopilot.js'
@@ -118,11 +118,6 @@ function init() {
           chatModel,
           maturityModel
         )
-        
-        const indexNames = getStoryIndexNames()
-        argParser.choices('fetch-stories-index', indexNames)
-        argParser.choices('index', indexNames)
-        argParser.default('index', indexNames[0])
 
         return readerInit(
           logger, ai, chatModel, maturityModel, readingDifficultyWordsMax, readingDifficultyPhrasesMax

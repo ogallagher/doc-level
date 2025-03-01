@@ -10,6 +10,7 @@ import { hideBin } from 'yargs/helpers'
 import { compileRegexp } from './stringUtil.js'
 import { RelationalTagConnection } from 'relational_tags'
 import { writeText } from './writer.js'
+import { getStoryIndexNames } from './storiesIndex/index.js'
 /**
  * @typedef {import('pino').Logger} Logger
  * @typedef {import('./storiesIndex/storiesIndex.js').StoriesIndex} StoriesIndex
@@ -23,13 +24,30 @@ const ENV_PATH = '.env'
 const ENV_KEY_OPENAI_API_KEY = 'OPENAI_API_KEY' 
 const ENV_KEY_READING_DIFFICULTY_WORDS_MAX = 'READING_DIFFICULTY_WORDS_MAX'
 const ENV_KEY_READING_DIFFICULTY_PHRASES_MAX = 'READING_DIFFICULTY_PHRASES_MAX'
+const ENV_KEY_INDEX = 'STORIES_INDEX'
+const ENV_KEY_FETCH_STORIES_MAX = 'FETCH_STORIES_MAX'
+const ENV_KEY_STORY_LENGTH_MAX = 'STORY_LENGTH_MAX'
+const ENV_KEY_STORIES_DIR = 'STORIES_DIR'
+const ENV_KEY_PROFILES_DIR = 'PROFILES_DIR'
+const ENV_KEY_RENDERS_DIR = 'RENDERS_DIR'
+const ENV_KEY_HISTORY_DIR = 'HISTORY_DIR'
+const ENV_KEY_TAGS_DIR = 'TAGS_DIR'
+
 /**
  * All recognized environment variables.
  */
 const ENV_KEYS = new Set([
   ENV_KEY_OPENAI_API_KEY,
   ENV_KEY_READING_DIFFICULTY_WORDS_MAX,
-  ENV_KEY_READING_DIFFICULTY_PHRASES_MAX
+  ENV_KEY_READING_DIFFICULTY_PHRASES_MAX,
+  ENV_KEY_INDEX,
+  ENV_KEY_FETCH_STORIES_MAX,
+  ENV_KEY_STORY_LENGTH_MAX,
+  ENV_KEY_STORIES_DIR,
+  ENV_KEY_PROFILES_DIR,
+  ENV_KEY_RENDERS_DIR,
+  ENV_KEY_HISTORY_DIR,
+  ENV_KEY_TAGS_DIR
 ])
 
 export const SEARCHES_DIR = 'searches'
@@ -126,6 +144,7 @@ const OpenAIModerationModel = {
   TEXT_LATEST: 'text-moderation-latest'
 }
 
+// option defaults
 export const READING_DIFFICULTY_REASONS_MAX = 10
 export const READING_DIFFICULTY_WORDS_MIN = 10
 export const READING_DIFFICULTY_WORDS_MAX = 30
@@ -138,6 +157,28 @@ export const IDEOLOGY_EXAMPLES_MAX = 10
 // Effectively disabled library search intermediate result set limits, to be replaced by configurable limits on final result.
 export const SEARCH_TAGS_MAX = Number.POSITIVE_INFINITY
 export const SEARCH_TAG_BOOKS_MAX = Number.POSITIVE_INFINITY
+const FETCH_STORIES_MAX = 10
+const STORY_LENGTH_MAX = 3500
+const STORIES_DIR = path.join('data', 'stories')
+const PROFILES_DIR = path.join('data', 'profiles')
+const RENDERS_DIR = path.join('data', 'renders')
+const HISTORY_DIR = path.join('data', 'history')
+const TAGS_DIR = path.join('data', 'tags')
+
+/**
+ * Permitted stories index names.
+ * 
+ * @type {Set<string>}
+ */
+let _indexNameChoices = new Set()
+/**
+ * @type {string}
+ */
+let _defaultIndexName
+
+export function getDefaultIndexName() {
+  return _defaultIndexName
+}
 
 /**
  * @type {Logger}
@@ -162,7 +203,7 @@ export const argParser = (
     alias: 'm',
     type: 'number',
     description: 'Max number of stories to fetch.',
-    default: 10
+    default: FETCH_STORIES_MAX
   })
   .option('story', {
     alias: 's',
@@ -192,7 +233,7 @@ export const argParser = (
     alias: 'n',
     type: 'number',
     description: 'Max character length of story text to include when generating its profile.',
-    default: 3500
+    default: STORY_LENGTH_MAX
   })
   .option('force-profile', {
     alias: 'P',
@@ -295,29 +336,29 @@ export const argParser = (
     alias: 'd',
     type: 'string',
     description: 'Local filesystem directory where story lists and texts are saved.',
-    default: path.join('data', 'stories')
+    default: STORIES_DIR
   })
   .option('profiles-dir', {
     alias: 'D',
     type: 'string',
     description: 'Local directory where story profiles are saved.',
-    default: path.join('data', 'profiles')
+    default: PROFILES_DIR
   })
   .option('renders-dir', {
     alias: 'e',
     type: 'string',
     description: 'Local directory where library renderings/exports are saved.',
-    default: path.join('data', 'renders')
+    default: RENDERS_DIR
   })
   .option('history-dir', {
     type: 'string',
     description: 'Local directory where activity history (ex. library search history) is saved.',
-    default: path.join('data', 'history')
+    default: HISTORY_DIR
   })
   .option('tags-dir', {
     type: 'string',
     description: 'Local directory where user defined custom tags are saved.',
-    default: path.join('data', 'tags')
+    default: TAGS_DIR
   })
   .option('log-level', {
     alias: 'l',
@@ -379,12 +420,22 @@ export function loadArgs(argSrc=hideBin(process.argv)) {
   return new Promise(function(res) {
     logger.debug('load runtime args')
 
+    const indexNames = getStoryIndexNames().concat('')
+    _defaultIndexName = envGet(ENV_KEY_INDEX, indexNames[0])
+
+    // yargs Argv.choices currently creates duplicates if called multiple times
+    for (let indexName of indexNames.filter((n) => !_indexNameChoices.has(n))) {
+      _indexNameChoices.add(indexName)
+      argParser.choices('fetch-stories-index', [indexName])
+      argParser.choices('index', [indexName])
+    }
+
     /**
      * @type {Args}
      */
     const argv = argParser.parse(argSrc)
 
-    // query
+    // query: parse string vs regexp
     if (argv.query !== undefined) {
       const query_regexp = compileRegexp(argv.query)
       if (query_regexp !== undefined) {
@@ -395,6 +446,68 @@ export function loadArgs(argSrc=hideBin(process.argv)) {
         // technically, this should be redundant if relational_tags is case insensitive
         argv.query = argv.query.toLowerCase()
       }
+    }
+
+    // update defaults in process.env and argParser
+    for (let envKey of ENV_KEYS) {
+      let val, optKey, optVal, defaultVal, typeCast
+
+      if (envKey === ENV_KEY_INDEX) {
+        // custom default handling for index
+        for (optKey of ['index', 'fetch-stories-index']) {
+          optVal = argv[optKey]
+
+          // custom default handling is done by accepting empty string for the opt value
+          if (optVal !== undefined && optVal !== '') {
+            process.env[envKey] = optVal
+            _defaultIndexName = optVal
+            break
+          }
+        }
+
+        continue
+      }
+      else if (envKey === ENV_KEY_FETCH_STORIES_MAX) {
+        optKey = 'fetch-stories-max'
+        defaultVal = FETCH_STORIES_MAX
+        typeCast = parseInt
+      }
+      else if (envKey === ENV_KEY_STORY_LENGTH_MAX) {
+        optKey = 'story-length-max'
+        defaultVal = STORY_LENGTH_MAX
+        typeCast = parseInt
+      }
+      else if (envKey === ENV_KEY_STORIES_DIR) {
+        optKey = 'stories-dir'
+        defaultVal = STORIES_DIR
+      }
+      else if (envKey === ENV_KEY_PROFILES_DIR) {
+        optKey = 'profiles-dir'
+        defaultVal = PROFILES_DIR
+      }
+      else if (envKey === ENV_KEY_RENDERS_DIR) {
+        optKey = 'renders-dir'
+        defaultVal = RENDERS_DIR
+      }
+      else if (envKey === ENV_KEY_HISTORY_DIR) {
+        optKey = 'history-dir'
+        defaultVal = HISTORY_DIR
+      }
+      else if (envKey === ENV_KEY_TAGS_DIR) {
+        optKey = 'tags-dir'
+        defaultVal = TAGS_DIR
+      }
+      else {
+        // given key is not exposed to argParser
+        continue
+      }
+
+      optVal = argv[optKey]
+      if (optVal !== undefined) {
+        process.env[envKey] = optVal
+      }
+      val = envGet(envKey, defaultVal, typeCast)
+      argParser.default(optKey, val)
     }
   
     logger.info('loaded runtime args')
@@ -409,7 +522,7 @@ export function loadArgs(argSrc=hideBin(process.argv)) {
  * @param {T} defaultValue 
  * @param {function(string): T} typeCast 
  * 
- * @returns Value typed according to `typeCast`.
+ * @returns {T|undefined} Value typed according to `typeCast`, or `undefined` if no default was provided.
  */
 function envGet(envKey, defaultValue, typeCast) {
   let value = process.env[envKey]
@@ -417,9 +530,11 @@ function envGet(envKey, defaultValue, typeCast) {
     value = defaultValue
   }
 
-  process.env[envKey] = value
+  if (value !== undefined) {
+    process.env[envKey] = value
+  }
 
-  if (typeCast === undefined) {
+  if (typeCast === undefined || value === undefined) {
     return value
   }
   else {
