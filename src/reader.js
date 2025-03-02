@@ -3,6 +3,7 @@
  */
 
 import { zodResponseFormat } from 'openai/helpers/zod'
+import { RateLimitError } from 'openai'
 import path from 'path'
 import { readFile, readdir, access as fsAccess, constants as fsConstants } from 'node:fs/promises'
 import * as HtmlParser from 'node-html-parser'
@@ -77,6 +78,10 @@ let _difficultWordsMax
  * @type {number}
  */
 let _difficultPhrasesMax
+/**
+ * @type {Date[]}
+ */
+let _retryStack = []
 
 /**
  * 
@@ -89,7 +94,7 @@ let _difficultPhrasesMax
  * @returns {Promise<undefined>}
  */
 export function init(parentLogger, ai, chatModel, maturityModel, difficultWordsMax, difficultPhrasesMax) {
-  return new Promise(function(res, rej) {
+  return new Promise(function(res) {
     logger = parentLogger.child(
       {
         name: 'reader'
@@ -133,17 +138,57 @@ export class Context {
 }
 
 /**
+ * Whether to retry the failed request to the language model API.
+ * 
+ * @param {Error} err 
+ * 
+ * @returns {false|{
+ *  delayMillis: number
+ *  onComplete: function
+ * }}
+ */
+function canRetryModelRequest(err) {
+  if (err instanceof RateLimitError) {
+    if (err.code === 'rate_limit_exceeded') {
+      logger.info('exceeded rate limit for language model API; throttle request and try again. %s', err.message)
+      const delayScale = _retryStack.length + 1
+      const delayMin = 1000 * delayScale
+      const delayRange = 10000 * delayScale
+      _retryStack.push(new Date())
+      return {
+        delayMillis: (Math.random() * delayRange) + delayMin,
+        onComplete: () => _retryStack.pop()
+      }
+    }
+  }
+
+  return false
+}
+
+/**
  * 
  * @param {string} instructions 
  * @param {string} request 
- * @param {MessageSchema} responseFormat 
+ * @param {MessageSchema} responseFormat
+ * @param {number} attemptsRemaining 
  * 
  * @returns {Promise<*>} Structured response from lang model API matching the given message schema.
  */
-function getChatResponse(instructions, request, responseFormat) {
-  return new Promise(function(res, rej) {
-    logger.debug('call _ai.chat.completions')
-    _ai.chat.completions.create({
+async function getChatResponse(instructions, request, responseFormat, attemptsRemaining=10) {
+  logger.debug('call _ai.chat.completions')
+  /**
+   * @type {{
+   *  choices: {
+   *    message: {
+   *      refusal: boolean
+   *      content: string
+   *    }
+   *  }[]
+   * }}
+   */
+  let completion
+  try {
+    completion = await _ai.chat.completions.create({
       model: _chatModel,
       store: false,
       max_completion_tokens: null,
@@ -163,36 +208,52 @@ function getChatResponse(instructions, request, responseFormat) {
         }
       ]
     })
-    .then(
-      (completion) => {
-        let response = completion.choices[0].message
-        if(response.refusal) {
-          logger.error('chat model refused to answer as requested')
-          rej(filterAIError(completion.choices[0]))
-        }
-        else {
-          try {
-            res(JSON.parse(response.content))
-          }
-          catch (err) {
-            logger.error('unable to parse chat response=%o', response)
-            rej(err)
-          }
-        }
-      },
-      (err) => {
-        rej(filterAIError(err))
+  }
+  catch (err) {
+    let retry = canRetryModelRequest(err)
+    if (retry) {
+      if (--attemptsRemaining > 0) {
+        return await new Promise((res) => {
+          setTimeout( 
+            () => {
+              getChatResponse(instructions, request, responseFormat, attemptsRemaining)
+              .then((response) => {
+                retry.onComplete()
+                res(response)
+              })
+            },
+            retry.delayMillis
+          )
+        })
       }
-    )
-  })
+    }
+    
+    throw filterAIError(err)
+  }
+
+  let response = completion.choices[0].message
+  if(response.refusal) {
+    logger.error('chat model refused to answer as requested')
+    throw filterAIError(completion.choices[0])
+  }
+  else {
+    try {
+      return JSON.parse(response.content)
+    }
+    catch (err) {
+      logger.error('unable to parse chat response=%o', response)
+      throw err
+    }
+  }
 }
 
 /**
  * @param {string} request 
+ * @param {number} attemptsRemaining
  * 
  * @returns {Promise<Maturity>}
  */
-async function getModerationResponse(request) {
+async function getModerationResponse(request, attemptsRemaining=10) {
   logger.debug('call _ai.moderations')
   
   try {
@@ -224,6 +285,27 @@ async function getModerationResponse(request) {
     )
   }
   catch (err) {
+    let retry = canRetryModelRequest(err)
+    if (retry) {
+      if (--attemptsRemaining > 0) {
+        return await new Promise((res) => {
+          setTimeout(
+            () => {
+              getModerationResponse(request, attemptsRemaining)
+              .then((response) => {
+                retry.onComplete()
+                res(response)
+              })
+            },
+            retry.delayMillis
+          )
+        })
+      }
+      else {
+        logger.error('max retries exceeded for getModerationResponse; try again later %s', err)
+      }
+    }
+    
     throw filterAIError(err)
   }
 }
