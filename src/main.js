@@ -229,7 +229,11 @@ async function fetchStorySummaries(
   // @next in this context refers to last+1 instead of previous+1
   // Math.max returns -infinity if no local pages exist
   const lastPageNumber = Math.max(
-    ...(await reader.listStoryIndexPages(storiesDir, index.name)).get(index.name).keys()
+    ...(
+      (await reader.listStoryIndexPages(storiesDir, index.name))
+      .get(index.name)?.keys()
+      || []
+    )
   )
   const pageNumber = await resolvePageVar(startPage, lastPageNumber, index.name)
 
