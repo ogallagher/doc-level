@@ -78,6 +78,9 @@ export function openFile(path) {
   return open(path, 'w')
 }
 
+/**
+ * @returns {Promise<string|undefined>}
+ */
 export function initDir(path) {
   return fsAccess(path, fsConstants.F_OK)
   .then(

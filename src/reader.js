@@ -965,6 +965,9 @@ export async function listStoryIndexPages(storiesDir, indexName) {
    */
   const indexPages = new Map()
 
+  // ensure index stories dir exists
+  await initDir(path.join(storiesDir, indexName))
+
   await (
     listFiles(
       indexName === undefined 
