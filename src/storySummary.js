@@ -37,7 +37,7 @@ export class StorySummary extends LibraryDescriptor {
     /**
      * @type {Date|undefined}
      */
-    this.publishDate = publishDate !== undefined && publishDate !== null ? new Date(publishDate) : undefined
+    this.publishDate = (publishDate !== undefined && publishDate !== null) ? new Date(publishDate) : undefined
     /**
      * @type {number}
      */

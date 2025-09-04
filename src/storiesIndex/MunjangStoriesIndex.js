@@ -32,6 +32,8 @@ export class MunjangStoriesIndex extends StoriesIndex {
 
   static excerptAuthorRegexp = /\s*([가-힣]{2,})\s+/
 
+  static titleStartIdxMax = 32
+
   constructor() {
     let url = new URL('https://munjang.or.kr/board.es')
     url.searchParams.set('act', 'list')
@@ -45,7 +47,9 @@ export class MunjangStoriesIndex extends StoriesIndex {
       url.toString(),
       ['문장웹진', 'mj'],
       1,
-      70
+      70,
+      undefined, undefined, undefined, undefined, undefined,
+      12
     )
   }
 
@@ -78,6 +82,8 @@ export class MunjangStoriesIndex extends StoriesIndex {
         MunjangStoriesIndex.logger.debug('stories[%s] title.raw=%s author.raw=%s', idx, title, author)
 
         const meta = storyEl.querySelector(MunjangStoriesIndex.selectorMeta)
+        const metaDate = meta.querySelector(MunjangStoriesIndex.selectorMetaDate) || undefined
+        const metaViews = meta.querySelector(MunjangStoriesIndex.selectorMetaViews) || undefined
 
         const excerpt = storyEl.querySelector(MunjangStoriesIndex.selectorExcerpt).textContent
           .replace(/&lsquo.+&rsquo;\s+/, '')
@@ -92,7 +98,9 @@ export class MunjangStoriesIndex extends StoriesIndex {
 
           const titleStartIdx = excerpt.indexOf(title)
           const titleEndIdx = (
-            titleStartIdx !== -1 ? titleStartIdx + title.length : 0
+            (titleStartIdx !== -1 && titleStartIdx < MunjangStoriesIndex.titleStartIdxMax) 
+            ? titleStartIdx + title.length 
+            : 0
           )
           const authorMatcher = MunjangStoriesIndex.excerptAuthorRegexp.exec(excerpt.substring(titleEndIdx))
           
@@ -120,8 +128,12 @@ export class MunjangStoriesIndex extends StoriesIndex {
         let storySummary = {
           authorName: author.trim(),
           title: title.trim(),
-          publishDate: new Date(meta.querySelector(MunjangStoriesIndex.selectorMetaDate).textContent),
-          viewCount: parseInt(meta.querySelector(MunjangStoriesIndex.selectorMetaViews).textContent),
+          publishDate: (
+            metaDate === undefined ? undefined : new Date(metaDate.textContent)
+          ),
+          viewCount: (
+            metaViews === undefined ? -1 : parseInt(metaViews.textContent)
+          ),
           // concatenate origin (root without path) and story path
           url: url,
           excerpts: [
