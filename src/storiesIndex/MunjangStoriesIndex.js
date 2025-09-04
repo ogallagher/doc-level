@@ -30,7 +30,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
     'blockquote'
   ].join(',')
 
-  static excerptAuthorRegexp = /\s*([가-힣]{2,})\s+/
+  static excerptAuthorRegexp = /\s*([가-힣]{2,}|[가-힣 ]{3,})\s+/
 
   static titleStartIdxMax = 32
 
