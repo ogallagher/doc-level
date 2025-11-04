@@ -141,7 +141,14 @@ const OpenAIChatModel = {
   GPT_4_MINI: 'gpt-4o-mini'
 }
 const OpenAIModerationModel = {
-  TEXT_LATEST: 'text-moderation-latest'
+  /**
+   * Legacy moderation model.
+   */
+  TEXT_LATEST: 'text-moderation-latest',
+  /**
+   * Current moderation model, with support for both text and image input.
+   */
+  OMNI_LATEST: 'omni-moderation-latest'
 }
 
 // option defaults
@@ -578,7 +585,7 @@ function loadEnv() {
       res({
         ai: openai, 
         chatModel: OpenAIChatModel.GPT_4_MINI, 
-        maturityModel: OpenAIModerationModel.TEXT_LATEST,
+        maturityModel: OpenAIModerationModel.OMNI_LATEST,
         readingDifficultyWordsMax,
         readingDifficultyPhrasesMax
       })
