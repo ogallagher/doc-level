@@ -78,20 +78,31 @@ export class MunjangStoriesIndex extends StoriesIndex {
         const splitIdx = titleAuthor.indexOf('-')
 
         let author = titleAuthor.substring(0, splitIdx)
-        const title = titleAuthor.substring(splitIdx + 1)
+        let title = titleAuthor.substring(splitIdx + 1)
+        let subtitle = undefined
+
+        // list item header is <title>-<format-episode> rather than <author>-<title>
+        if (title.indexOf('편연재') !== -1) {
+          subtitle = title
+          title = author
+          author = undefined
+        }
+
         MunjangStoriesIndex.logger.debug('stories[%s] title.raw=%s author.raw=%s', idx, title, author)
 
         const meta = storyEl.querySelector(MunjangStoriesIndex.selectorMeta)
         const metaDate = meta.querySelector(MunjangStoriesIndex.selectorMetaDate) || undefined
         const metaViews = meta.querySelector(MunjangStoriesIndex.selectorMetaViews) || undefined
 
-        const excerpt = storyEl.querySelector(MunjangStoriesIndex.selectorExcerpt).textContent
+        const excerpt = (
+          storyEl.querySelector(MunjangStoriesIndex.selectorExcerpt).textContent
           .replace(/&lsquo.+&rsquo;\s+/, '')
           .replace(/광고 건너뛰기▶｜\s+/, '')
           .replaceAll(/[\r\n]+\s+/g, ' ')
           .trim()
+        )
 
-        if (splitIdx === -1) {
+        if (splitIdx === -1 || author === undefined) {
           MunjangStoriesIndex.logger.debug(
             'title=%s does not contain author; get from start of excerpt after title'
           )
@@ -127,7 +138,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
          */
         let storySummary = {
           authorName: author.trim(),
-          title: title.trim(),
+          title: (subtitle === undefined ? title : [title, subtitle].join('-')).trim(),
           publishDate: (
             metaDate === undefined ? undefined : new Date(metaDate.textContent)
           ),
@@ -182,6 +193,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
       pgraph = pgraphEl.textContent
         .replaceAll(/\s+/g, ' ')
         .replaceAll(/[“”]/g, '"')
+        .replaceAll(/[‘’]/g, "'")
         .trim()
 
       try {
