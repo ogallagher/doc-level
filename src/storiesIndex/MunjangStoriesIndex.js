@@ -47,7 +47,7 @@ export class MunjangStoriesIndex extends StoriesIndex {
       url.toString(),
       ['문장웹진', 'mj'],
       1,
-      70,
+      75,
       undefined, undefined, undefined, undefined, undefined,
       12
     )
@@ -128,10 +128,10 @@ export class MunjangStoriesIndex extends StoriesIndex {
           }
         }
 
-        const url = new URL(path.join(
-          this.urlTemplate.origin,
-          storyEl.querySelector(MunjangStoriesIndex.selectorStoryUrl).getAttribute('href')
-        ))
+        const url = new URL(
+          storyEl.querySelector(MunjangStoriesIndex.selectorStoryUrl).getAttribute('href'),
+          this.urlTemplate.origin
+        )
 
         /**
          * @type {StorySummary}

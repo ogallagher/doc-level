@@ -53,6 +53,12 @@ export const PROMPT_IDEOLOGIES_FILE = 'ideologyPolitics.txt'
 export const PROMPT_BROWSE_STORIES_FILE = 'browseStories.txt'
 
 /**
+ * Parse stories index page path into [1] index name [2] page number.
+ * Accepts both `/` (posix) and `\` (windows) path separators.
+ */
+const pagePathRegExp = /([^\/\\]+)[\/\\]page-(\d+)/
+
+/**
  * @type {Logger}
  */
 let logger
@@ -981,8 +987,6 @@ export async function listStoryIndexPages(storiesDir, indexName) {
     )
     .then((indexPaths) => {
       logger.debug('parsing %s story index page paths', indexPaths.length)
-      const pagePathRegExp = new RegExp(`${indexName === undefined ? '([^\/]+)/' : ''}page-(\\d+)`)
-
       indexPaths.forEach(
         /**
          * @param {string} indexPagePath 
@@ -996,7 +1000,7 @@ export async function listStoryIndexPages(storiesDir, indexName) {
           else {
             const indexPage = new IndexPage(
               indexName || pagePathParse[1],
-              parseInt(pagePathParse[indexName === undefined ? 2 : 1]),
+              parseInt(pagePathParse[2]),
               indexPagePath
             )
 
